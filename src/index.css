@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
+    --primary: 45 93% 47%; /* Gold */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 45 10% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 45 93% 47%;
+    --accent-foreground: 0 0% 0%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 45 93% 47%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+  html {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .bg-gold-gradient {
+    background: linear-gradient(
+      135deg,
+      #F4D06F 0%,
+      #D4A63A 40%,
+      #A87412 70%,
+      #7A5200 100%
+    );
+  }
+  .text-gold-gradient {
+    background: linear-gradient(
+      135deg,
+      #F4D06F 0%,
+      #D4A63A 40%,
+      #A87412 70%,
+      #7A5200 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* ─── TipTap Editor ─────────────────────────────────────── */
+.tiptap {
+  outline: none;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #4a5568;
+  pointer-events: none;
+  height: 0;
+}
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+/* ─── Article Content (rendered HTML from editor) ───────── */
+.article-content h1 { @apply text-3xl font-black mt-10 mb-4 text-white; }
+.article-content h2 { @apply text-2xl font-bold mt-8 mb-3 text-white; }
+.article-content h3 { @apply text-xl font-bold mt-6 mb-2 text-white; }
+.article-content p  { @apply text-slate-300 leading-relaxed mb-4; }
+.article-content ul { @apply list-disc pl-6 mb-4 space-y-1 text-slate-300; }
+.article-content ol { @apply list-decimal pl-6 mb-4 space-y-1 text-slate-300; }
+.article-content li { @apply leading-relaxed; }
+.article-content blockquote {
+  @apply border-l-4 border-amber-500 pl-5 py-1 my-6 italic text-slate-400 bg-amber-500/5 rounded-r-xl;
+}
+.article-content code {
+  @apply bg-white/10 text-amber-300 text-sm px-1.5 py-0.5 rounded font-mono;
+}
+.article-content pre {
+  @apply bg-white/5 border border-white/10 rounded-xl p-4 overflow-x-auto mb-6;
+}
+.article-content pre code { @apply bg-transparent p-0 text-slate-200; }
+.article-content a { @apply text-primary underline underline-offset-2 hover:opacity-80; }
+.article-content strong { @apply text-white font-bold; }
+.article-content em { @apply italic; }
+.article-content u { @apply underline; }
+.article-content s { @apply line-through text-slate-500; }
+.article-content hr { @apply border-white/10 my-8; }
+.article-content img { @apply max-w-full h-auto rounded-2xl my-6 mx-auto; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(222 47% 8%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(217 33% 25%);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(217 33% 35%);
+}
