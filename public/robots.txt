@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /profile/
+Disallow: /admin/
+Disallow: /support/
+Disallow: /referral/
+
+Sitemap: https://cryptoex.id/sitemap.xml
