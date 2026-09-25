@@ -7,6 +7,7 @@ import { sendSlackMessage } from './notify/slack.js'
 
 const state = loadState(CONFIG.startingEquity, Date.now())
 state.tradingMode = CONFIG.tradingMode
+state.strategy = CONFIG.strategy
 saveState(state)
 
 // log() dipakai di seluruh engine (scanWorker, positionManager, dst) — selain nulis ke
@@ -21,7 +22,7 @@ function log(msg: string) {
 const watchlistDesc = CONFIG.watchlistMode === 'all'
   ? `all (top ${CONFIG.maxWatchlistSize} pair USDT-M by volume, live-ranked tiap scan)`
   : CONFIG.watchlist.join(',')
-log(`TRADING_MODE=${CONFIG.tradingMode} | watchlist=${watchlistDesc} | equity=${state.equity}`)
+log(`TRADING_MODE=${CONFIG.tradingMode} | STRATEGY=${CONFIG.strategy} | watchlist=${watchlistDesc} | equity=${state.equity}`)
 if (!CONFIG.controlApiToken) {
   log('PERINGATAN: CONTROL_API_TOKEN kosong — API server tidak dilindungi auth. Cuma aman untuk localhost.')
 }

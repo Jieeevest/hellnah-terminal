@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import path from 'node:path'
 
 function num(name: string, fallback: number): number {
   const v = process.env[name]
@@ -46,6 +47,14 @@ export const CONFIG = {
   binanceApiSecret: process.env.BINANCE_API_SECRET ?? '',
   // Kosong -> notifikasi Slack dimatikan (no-op), gak ada error. Lihat server/src/notify/slack.ts.
   slackWebhookUrl: process.env.SLACK_WEBHOOK_URL ?? '',
+  // Strategi exit (lihat positionManager.ts): 'stable' = TP 3% + tahan 72 jam, 'trailing' =
+  // trailing stop tanpa TP tetap, tahan 2 minggu. Trailing cuma didukung di paper mode.
+  strategy: (process.env.STRATEGY ?? 'stable') as 'stable' | 'trailing',
+  // Akun paper kedua jalan sebagai proses terpisah dengan DATA_DIR & PORT sendiri
+  // (lihat script start:akun-b di package.json).
+  dataDir: process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(process.cwd(), 'data'),
+  // Scalp scanner & forward-test F3 cukup jalan di satu akun, gak perlu dobel request.
+  shadowExperiments: process.env.SHADOW_EXPERIMENTS !== '0',
 }
 
 // 'paper' = simulasi lokal (M3). 'live' = order execution beneran ke Binance Futures
@@ -56,6 +65,13 @@ if (CONFIG.tradingMode !== 'paper' && CONFIG.tradingMode !== 'live') {
   throw new Error(
     `TRADING_MODE='${CONFIG.tradingMode}' belum didukung. Cuma 'paper' atau 'live' yang diimplementasikan.`
   )
+}
+if (CONFIG.strategy !== 'stable' && CONFIG.strategy !== 'trailing') {
+  throw new Error(`STRATEGY='${CONFIG.strategy}' tidak dikenal. Pilih 'stable' atau 'trailing'.`)
+}
+// Trailing di live butuh geser order STOP_MARKET di Binance tiap tick — belum dibuat.
+if (CONFIG.tradingMode === 'live' && CONFIG.strategy === 'trailing') {
+  throw new Error('STRATEGY=trailing baru didukung di TRADING_MODE=paper.')
 }
 if (CONFIG.tradingMode === 'live' && (!CONFIG.binanceApiKey || !CONFIG.binanceApiSecret)) {
   throw new Error('TRADING_MODE=live butuh BINANCE_API_KEY dan BINANCE_API_SECRET di server/.env')

@@ -6,17 +6,45 @@ import { runScalpScan } from './scalpScanner.js'
 import { runFundingShadow } from './fundingShadow.js'
 import { saveState, type AppState } from '../store/state.js'
 import { sendPeriodicSummary } from '../notify/periodicSummary.js'
+import { fetchCandles, fetchMarkPrice } from '../marketData/binancePublic.js'
+import { HARD_LIMITS } from '../config/limits.js'
 
 type LogFn = (msg: string) => void
 
 const FUNDING_SHADOW_INTERVAL_MS = 5 * 60_000
+const BTC_BRAKE_LOOKBACK_4H_BARS = 180 // 30 hari
 
 export function startTickLoop(state: AppState, log: LogFn, onUpdate: () => void): () => void {
   const isLive = CONFIG.tradingMode === 'live'
 
+  let btcBrakeActive = false
+
+  async function btcBrakeBlocksEntry(): Promise<boolean> {
+    const [candles, price] = await Promise.all([
+      fetchCandles('BTCUSDT', '4h', BTC_BRAKE_LOOKBACK_4H_BARS),
+      fetchMarkPrice('BTCUSDT'),
+    ])
+    const high = Math.max(price, ...candles.map((c) => c.high))
+    const drawdown = (high - price) / high
+    const pct = `${(drawdown * 100).toFixed(1)}%`
+    if (!btcBrakeActive && drawdown >= HARD_LIMITS.btcBrakeDrawdownPct) {
+      btcBrakeActive = true
+      log(`REM BTC aktif — BTC ${price.toFixed(0)} turun ${pct} dari tertinggi 30 hari ${high.toFixed(0)}, entry baru dijeda`)
+    } else if (btcBrakeActive && drawdown < HARD_LIMITS.btcBrakeResumePct) {
+      btcBrakeActive = false
+      log(`REM BTC dilepas — BTC ${price.toFixed(0)} tinggal ${pct} di bawah tertinggi 30 hari, entry baru jalan lagi`)
+    }
+    return btcBrakeActive
+  }
+
   async function scanOnce() {
     if (!state.enabled) return // scan cuma relevan buat entry baru — posisi terbuka tetap dikelola tickOnce
     try {
+      if (await btcBrakeBlocksEntry()) {
+        state.updatedAt = Date.now()
+        onUpdate()
+        return
+      }
       const candidates = await runScanCycle(state, log)
       if (candidates.length) {
         if (isLive) await tryOpenPositionsLive(state, candidates, log)
@@ -70,7 +98,7 @@ export function startTickLoop(state: AppState, log: LogFn, onUpdate: () => void)
   // gak ada order beneran, cuma nyatet ke data/scalp-longs.jsonl. Digate ke state.enabled
   // sama kayak scanOnce, biar konsisten "bot lagi aktif" = kedua scanner jalan bareng.
   async function scalpScanOnce() {
-    if (!state.enabled) return
+    if (!state.enabled || !CONFIG.shadowExperiments) return
     try {
       await runScalpScan(log)
     } catch (e) {
@@ -81,6 +109,7 @@ export function startTickLoop(state: AppState, log: LogFn, onUpdate: () => void)
   // Forward-test F3 shadow-only (lihat fundingShadow.ts) — sengaja TIDAK digate ke state.enabled:
   // tujuannya ngumpulin bukti strategi di data baru, gak buka posisi apa pun.
   async function fundingShadowOnce() {
+    if (!CONFIG.shadowExperiments) return
     try {
       await runFundingShadow(log)
     } catch (e) {

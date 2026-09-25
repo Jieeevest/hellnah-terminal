@@ -1,4 +1,5 @@
 export type PositionSide = 'long' | 'short'
+export type AutoTradeStrategy = 'stable' | 'trailing'
 
 export interface AutoTradeOpenPosition {
   id: string
@@ -12,6 +13,7 @@ export interface AutoTradeOpenPosition {
   stopLoss: number
   takeProfit1: number
   openedAt: number
+  strategy?: AutoTradeStrategy
   markPrice: number
   unrealizedPnlUsd: number
   unrealizedPnlPct: number
@@ -23,11 +25,12 @@ export interface AutoTradeClosedTrade {
   side: PositionSide
   entry: number
   exitPrice: number
-  exitReason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'MANUAL'
+  exitReason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'TRAIL' | 'MANUAL'
   realizedPnlUsd: number
   rMultiple: number
   openedAt: number
   closedAt: number
+  strategy?: AutoTradeStrategy
 }
 
 export interface AutoTradeDailyGuard {
@@ -58,6 +61,7 @@ export interface AutoTradeExternalPosition {
 export interface AutoTradeState {
   enabled: boolean
   tradingMode: string
+  strategy?: AutoTradeStrategy
   equity: number
   dailyGuard: AutoTradeDailyGuard
   openPositions: AutoTradeOpenPosition[]

@@ -6,6 +6,7 @@
   "description": "Backend auto-trading futures untuk hellnah-terminal. Fase M3: paper trading (market data + scan + eksekusi simulasi), belum ada koneksi exchange nyata.",
   "scripts": {
     "start": "tsx watch src/index.ts",
+    "start:akun-b": "PORT=3011 STRATEGY=trailing DATA_DIR=data/akun-b SHADOW_EXPERIMENTS=0 tsx watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

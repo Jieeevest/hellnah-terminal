@@ -8,32 +8,33 @@ function authHeaders(): HeadersInit {
   return TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}
 }
 
-export async function fetchAutoTradeState(): Promise<AutoTradeState> {
-  const res = await fetch(`${API_URLS.trading}/api/state`, { headers: authHeaders() })
+export async function fetchAutoTradeState(baseUrl = API_URLS.trading): Promise<AutoTradeState> {
+  const res = await fetch(`${baseUrl}/api/state`, { headers: authHeaders() })
   if (!res.ok) throw new Error(`GET /api/state -> HTTP ${res.status}`)
   return res.json()
 }
 
-async function postControl(action: 'enable' | 'disable' | 'close-all'): Promise<void> {
-  const res = await fetch(`${API_URLS.trading}/api/control/${action}`, {
+async function postControl(action: 'enable' | 'disable' | 'close-all', baseUrl: string): Promise<void> {
+  const res = await fetch(`${baseUrl}/api/control/${action}`, {
     method: 'POST',
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`POST /api/control/${action} -> HTTP ${res.status}`)
 }
 
-export const enableAutoTrade = () => postControl('enable')
-export const disableAutoTrade = () => postControl('disable')
-export const closeAllAutoTradePositions = () => postControl('close-all')
+export const enableAutoTrade = (baseUrl = API_URLS.trading) => postControl('enable', baseUrl)
+export const disableAutoTrade = (baseUrl = API_URLS.trading) => postControl('disable', baseUrl)
+export const closeAllAutoTradePositions = (baseUrl = API_URLS.trading) => postControl('close-all', baseUrl)
 
 export function subscribeAutoTradeStream(
   onState: (state: AutoTradeState) => void,
-  onError?: (err: Event) => void
+  onError?: (err: Event) => void,
+  baseUrl = API_URLS.trading
 ): () => void {
   // Base = origin halaman saat ini — wajib kalau API_URLS.trading berupa path relatif
   // (mis. '/api-trading' di deployment Docker), karena `new URL()` throw kalau argumen
   // pertama relatif dan nggak dikasih base sama sekali.
-  const url = new URL(`${API_URLS.trading}/api/stream`, window.location.origin)
+  const url = new URL(`${baseUrl}/api/stream`, window.location.origin)
   if (TOKEN) url.searchParams.set('token', TOKEN) // EventSource tidak bisa kirim header custom
 
   const es = new EventSource(url.toString())

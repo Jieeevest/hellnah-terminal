@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { CONFIG } from '../config/env.js'
 import type { DailyGuardState } from '../risk/dailyGuard.js'
 import type { PositionSide } from '../risk/liquidation.js'
 import type { Timeframe } from '../marketData/binancePublic.js'
@@ -29,6 +30,10 @@ export interface OpenPosition {
   // Posisi ini awalnya sinyal SHORT tapi dibalik jadi LONG (lihat HARD_LIMITS.shortToLongFlipSymbols)
   // -- dipakai buat nge-track flipLongSlCount per simbol pas posisi ini ditutup.
   flippedFromShort?: boolean
+  // Strategi exit yang dipakai saat posisi dibuka (CONFIG.strategy) — dikunci per posisi.
+  // peakPrice = harga terbaik sejak entry, dipakai trailing stop.
+  strategy?: 'stable' | 'trailing'
+  peakPrice?: number
   // Floating PnL — diupdate tiap tick (tickPositions, ~15 detik sekali) dari mark price live.
   markPrice: number
   unrealizedPnlUsd: number
@@ -49,7 +54,8 @@ export interface ClosedTrade {
   side: PositionSide
   entry: number
   exitPrice: number
-  exitReason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'MANUAL'
+  exitReason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'TRAIL' | 'MANUAL'
+  strategy?: 'stable' | 'trailing'
   realizedPnlUsd: number
   rMultiple: number
   openedAt: number
@@ -83,6 +89,8 @@ export interface AppState {
   // sebagai sumber kebenaran dari state.json lama, supaya selalu cerminan config aktif
   // saat proses ini jalan, bukan sisa mode sebelumnya.
   tradingMode: string
+  // Sama kayak tradingMode: diisi ulang dari CONFIG.strategy tiap startup.
+  strategy: string
   equity: number
   dailyGuard: DailyGuardState
   openPositions: OpenPosition[]
@@ -109,13 +117,14 @@ export function pushActivity(state: AppState, message: string, nowMs: number): v
   }
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data')
+const DATA_DIR = CONFIG.dataDir
 const STATE_FILE = path.join(DATA_DIR, 'state.json')
 
 export function createInitialState(startingEquity: number, nowMs: number): AppState {
   return {
     enabled: false,
     tradingMode: 'paper',
+    strategy: 'stable',
     equity: startingEquity,
     dailyGuard: {
       dayKeyUtc: new Date(nowMs).toISOString().slice(0, 10),

@@ -37,6 +37,11 @@ export const HARD_LIMITS = {
   // 15% saldo (user, 25 Sep 2026) — dengan SL 20% & leverage 5x, market anjlok serentak
   // cuma bisa makan ~15% saldo, bukan seluruh akun cross margin.
   maxTotalMarginPct: 0.15,
+  // Rem BTC (user, 25 Sep 2026): entry baru dijeda kalau BTC turun >= 10% dari harga
+  // tertinggi 30 hari (bukan turun harian — penurunan pelan berminggu-minggu tetap kena).
+  // Baru dilepas lagi di bawah 7% supaya gak nyala-mati bolak-balik di sekitar 10%.
+  btcBrakeDrawdownPct: 0.1,
+  btcBrakeResumePct: 0.07,
   maxTotalNotionalPct: 3.0,
   maxSameDirectionPositions: 3,
 

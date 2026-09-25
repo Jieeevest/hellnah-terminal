@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { CONFIG } from '../config/env.js'
 
-const DATA_DIR = path.join(process.cwd(), 'data')
+const DATA_DIR = CONFIG.dataDir
 const LOG_FILE = path.join(DATA_DIR, 'trades.jsonl')
 
 export interface TradeLogEntry {

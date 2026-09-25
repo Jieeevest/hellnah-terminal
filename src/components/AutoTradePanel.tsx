@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Bot, Power, PowerOff, Octagon, Wifi, WifiOff, Scan, XCircle, CheckCircle2, AlertTriangle, Clock, Activity, ChevronDown, ChevronRight, Eye, TrendingUp, TrendingDown } from 'lucide-react'
+import { Bot, Power, PowerOff, Octagon, Wifi, WifiOff, Scan, XCircle, CheckCircle2, AlertTriangle, Clock, Activity, ChevronDown, ChevronRight, Eye, TrendingUp, TrendingDown, FlaskConical } from 'lucide-react'
 import { useAutoTrader } from '@/hooks/useAutoTrader'
 import { cn, formatPrice } from '@/lib/utils'
 import { CoinIcon } from '@/components/CoinIcon'
 import { Badge, BADGE_TEXT_TONE, type BadgeTone } from '@/components/ui/Badge'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
-import type { AutoTradeOpenPosition, AutoTradeClosedTrade, AutoTradeActivityEntry, AutoTradeExternalPosition } from '@/types/autoTrade'
+import type { AutoTradeOpenPosition, AutoTradeClosedTrade, AutoTradeActivityEntry, AutoTradeExternalPosition, AutoTradeStrategy } from '@/types/autoTrade'
+import { Pill } from '@/components/ui/PillTabs'
+import { API_URLS } from '@/constants/apiUrls'
 
 interface Props {
   active: boolean
@@ -17,6 +19,7 @@ const EXIT_LABEL: Record<AutoTradeClosedTrade['exitReason'], string> = {
   TP1: 'Take profit',
   TIME_STOP: 'Time stop',
   MAX_HOLD: 'Max hold',
+  TRAIL: 'Trailing stop',
   MANUAL: 'Manual',
 }
 
@@ -49,7 +52,7 @@ function PositionRow({ pos }: { pos: AutoTradeOpenPosition }) {
         <span>Entry: <span className="text-foreground/80 font-mono">{formatPrice(pos.entry)}</span></span>
         <span>SL: <span className="text-foreground/80 font-mono">{formatPrice(pos.stopLoss)}</span></span>
         <span>Qty: <span className="text-foreground/80 font-mono">{pos.qtyRemaining}</span></span>
-        <span>TP1: <span className="text-foreground/80 font-mono">{formatPrice(pos.takeProfit1)}</span></span>
+        <span>{pos.strategy === 'trailing' ? 'Trailing aktif' : 'TP1'}: <span className="text-foreground/80 font-mono">{formatPrice(pos.takeProfit1)}</span></span>
         <span className="col-span-3">Margin: <span className="text-foreground/80 font-mono">${pos.margin.toFixed(2)}</span></span>
       </div>
     </div>
@@ -134,6 +137,7 @@ const ACTIVITY_PATTERNS: { re: RegExp; parse: (m: RegExpMatchArray) => ParsedAct
   { re: /^(?:LIVE )?OPEN (long|short)( \(FLIP dari short\))? (\S+) @ (\S+) qty=\S+ lev=(\d+)x SL=(\S+)/, parse: (m) => ({ symbol: m[3], side: m[1] as 'long' | 'short', status: { label: 'Posisi dibuka', tone: 'green', icon: CheckCircle2 }, chips: [`@ ${m[4]}`, `${m[5]}x`, `SL ${m[6]}`, ...(m[2] ? ['Flip'] : [])] }) },
   { re: /^SL (\S+) @ (\S+)/, parse: (m) => ({ symbol: m[1], status: { label: 'Kena stop loss', tone: 'red', icon: XCircle }, chips: [`@ ${m[2]}`] }) },
   { re: /^TP1 (\S+) @ (\S+)/, parse: (m) => ({ symbol: m[1], status: { label: 'Take profit', tone: 'green', icon: CheckCircle2 }, chips: [`@ ${m[2]}`] }) },
+  { re: /^TRAIL (\S+) @ (\S+)/, parse: (m) => ({ symbol: m[1], status: { label: 'Trailing stop', tone: 'green', icon: CheckCircle2 }, chips: [`@ ${m[2]}`, 'Untung dikunci'] }) },
   { re: /^TIME_STOP (\S+) @ (\S+)/, parse: (m) => ({ symbol: m[1], status: { label: 'Profit diamankan', tone: 'green', icon: Clock }, chips: [`@ ${m[2]}`] }) },
   { re: /^MAX_HOLD (\S+) @ (\S+) — udah (\d+) jam/, parse: (m) => ({ symbol: m[1], status: { label: 'Ditutup paksa', tone: 'orange', icon: Clock }, chips: [`@ ${m[2]}`, `${m[3]} jam`] }) },
   { re: /^scan (\d+) simbol/, parse: (m) => ({ status: { label: 'Scan', tone: 'muted', icon: Scan }, chips: [`${m[1]} koin`] }) },
@@ -143,6 +147,8 @@ const ACTIVITY_PATTERNS: { re: RegExp; parse: (m: RegExpMatchArray) => ParsedAct
   { re: /^(\S+) ditolak: total margin bakal lewat plafon (\S+)/, parse: (m) => ({ symbol: m[1], status: { label: 'Ditolak', tone: 'muted', icon: XCircle }, chips: [`Batas margin ${m[2]}`] }) },
   { re: /^(\S+) DIHINDARI -- masuk blacklist/, parse: (m) => ({ symbol: m[1], status: { label: 'Dihindari', tone: 'orange', icon: AlertTriangle }, chips: ['Daftar hitam'] }) },
   { re: /^(\S+) DIHINDARI -- flip long udah kena SL (\d+)x/, parse: (m) => ({ symbol: m[1], status: { label: 'Dihindari', tone: 'orange', icon: AlertTriangle }, chips: [`${m[2]}x kena SL`] }) },
+  { re: /^REM BTC aktif — BTC (\S+) turun (\S+) dari tertinggi 30 hari (\S+)/, parse: (m) => ({ symbol: 'BTCUSDT', status: { label: 'Rem BTC aktif', tone: 'red', icon: Octagon }, chips: [`−${m[2]} dari ${m[3]}`, 'Tak buka posisi baru'] }) },
+  { re: /^REM BTC dilepas — BTC (\S+) tinggal (\S+)/, parse: (m) => ({ symbol: 'BTCUSDT', status: { label: 'Rem BTC dilepas', tone: 'green', icon: CheckCircle2 }, chips: [`−${m[2]} dari puncak`, 'Entry jalan lagi'] }) },
   { re: /^daily guard blokir entry baru/, parse: () => ({ status: { label: 'Rem harian aktif', tone: 'orange', icon: AlertTriangle }, chips: ['Tak buka posisi baru'] }) },
   { re: /^auto-trade ENABLED/, parse: () => ({ status: { label: 'Bot dinyalakan', tone: 'green', icon: Power }, chips: [] }) },
   { re: /^auto-trade DISABLED/, parse: () => ({ status: { label: 'Bot dimatikan', tone: 'muted', icon: PowerOff }, chips: ['Posisi tetap dijaga'] }) },
@@ -223,6 +229,66 @@ function ClosedTradeRow({ trade }: { trade: AutoTradeClosedTrade }) {
   )
 }
 
+// Aturan SL 20% mulai berlaku saat server di-restart ini — trade sebelumnya pakai aturan
+// lama, jadi tidak ikut dibandingkan. Pembanding = backtest 6 bulan terakhir, 68 koin.
+const RULES_SINCE = Date.parse('2026-09-25T04:57:00Z')
+const STRATEGY_INFO: Record<AutoTradeStrategy, { label: string; rules: string; winRate: number; avgPct: number }> = {
+  stable: { label: 'Stabil', rules: 'target 3% · batas rugi 20% · tutup paksa 72 jam', winRate: 0.85, avgPct: 0.0051 },
+  trailing: { label: 'Trailing', rules: 'trailing aktif setelah +3%, jarak 3% · batas rugi 20% · tahan maks 2 minggu', winRate: 0.85, avgPct: 0.0134 },
+}
+const ROUND_TRIP_FEE_PCT = 0.0015
+const ACCOUNT_STORAGE_KEY = 'hellnah-bot-account'
+
+function fmtPct(v: number) {
+  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`
+}
+
+function PaperVsBacktestCard({ trades, strategy }: { trades: AutoTradeClosedTrade[]; strategy: AutoTradeStrategy }) {
+  const info = STRATEGY_INFO[strategy]
+  const rets = trades
+    .filter((t) => t.closedAt >= RULES_SINCE && (t.strategy ?? 'stable') === strategy)
+    .map((t) => ((t.exitPrice - t.entry) / t.entry) * (t.side === 'long' ? 1 : -1) - ROUND_TRIP_FEE_PCT)
+  const n = rets.length
+  const avg = n ? rets.reduce((a, b) => a + b, 0) / n : 0
+  const winRate = n ? rets.filter((r) => r > 0).length / n : 0
+  const worst = n ? Math.min(...rets) : 0
+
+  return (
+    <div className="mx-3 my-2 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs">
+      <div className="flex items-center gap-1.5 font-semibold text-foreground">
+        <FlaskConical className="h-3.5 w-3.5 text-sky-300" /> Hasil nyata vs backtest
+        <span className="ml-auto font-normal text-muted-foreground">
+          sejak {new Date(RULES_SINCE).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+        </span>
+      </div>
+      <p className="text-muted-foreground mt-0.5">Strategi {info.label}: {info.rules}. Hasil per trade = gerak harga setelah perkiraan biaya.</p>
+      {n === 0 ? (
+        <p className="mt-1.5 text-foreground">Belum ada trade selesai dengan aturan ini.</p>
+      ) : (
+        <div className="grid grid-cols-4 gap-1 mt-1.5">
+          <div><div className="text-muted-foreground">Trade</div><div className="font-mono font-semibold text-foreground">{n}</div></div>
+          <div>
+            <div className="text-muted-foreground">Win rate</div>
+            <div className={cn('font-mono font-semibold', winRate >= info.winRate ? 'text-green-400' : 'text-foreground')}>{(winRate * 100).toFixed(0)}%</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Rata-rata</div>
+            <div className={cn('font-mono font-semibold', avg >= 0 ? 'text-green-400' : 'text-red-400')}>{fmtPct(avg)}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Terburuk</div>
+            <div className={cn('font-mono font-semibold', worst >= 0 ? 'text-green-400' : 'text-red-400')}>{fmtPct(worst)}</div>
+          </div>
+        </div>
+      )}
+      <p className="text-muted-foreground mt-1">
+        Pembanding backtest 6 bulan: win rate {(info.winRate * 100).toFixed(0)}%, rata-rata {fmtPct(info.avgPct)}/trade.
+        {n < 30 ? ' Sampel masih kecil — jangan disimpulkan dulu (minimal ±30 trade).' : ''}
+      </p>
+    </div>
+  )
+}
+
 // Fetch sekali per mount + refresh tiap 1 jam (kurs gak berubah cepat) — fallback ke
 // approx terakhir diketahui kalau fetch gagal, biar tampilan gak pernah blank/error.
 function useUsdIdrRate(): number {
@@ -251,16 +317,41 @@ function formatIdr(usd: number, rate: number): string {
 }
 
 export function AutoTradePanel({ active }: Props) {
-  const { state, status, actionError, enable, disable, closeAll } = useAutoTrader(active)
+  const [accountId, setAccountId] = useState(() => {
+    try { return localStorage.getItem(ACCOUNT_STORAGE_KEY) ?? 'a' } catch { return 'a' }
+  })
+  const account = API_URLS.tradingAccounts.find((a) => a.id === accountId) ?? API_URLS.tradingAccounts[0]
+  const selectAccount = (id: string) => {
+    setAccountId(id)
+    try { localStorage.setItem(ACCOUNT_STORAGE_KEY, id) } catch { /* abaikan */ }
+  }
+  const { state, status, actionError, enable, disable, closeAll } = useAutoTrader(active, account.url)
   const [confirmingCloseAll, setConfirmingCloseAll] = useState(false)
   const [showExternalPositions, setShowExternalPositions] = useState(false)
   const usdIdrRate = useUsdIdrRate()
 
+  const accountTabs = (
+    <div className="flex gap-1">
+      {API_URLS.tradingAccounts.map((a) => (
+        <Pill key={a.id} active={a.id === account.id} onClick={() => selectAccount(a.id)} className="flex-1">
+          {a.label}
+        </Pill>
+      ))}
+    </div>
+  )
+
   if (!state) {
-    return status === 'disconnected'
-      ? <EmptyState icon={WifiOff} title="Server bot tidak terhubung" description={<>Jalankan <code className="font-mono">cd server &amp;&amp; npm start</code> — panel tersambung otomatis.</>} />
-      : <EmptyState loading title="Menghubungkan ke server bot…" />
+    const startCmd = account.id === 'a' ? 'npm start' : 'npm run start:akun-b'
+    return (
+      <div className="flex flex-col h-full">
+        <div className="px-3 py-2 border-b border-border shrink-0">{accountTabs}</div>
+        {status === 'disconnected'
+          ? <EmptyState icon={WifiOff} title={`Server ${account.label} tidak terhubung`} description={<>Jalankan <code className="font-mono">cd server &amp;&amp; {startCmd}</code> — panel tersambung otomatis.</>} />
+          : <EmptyState loading title="Menghubungkan ke server bot…" />}
+      </div>
+    )
   }
+  const strategy = state.strategy ?? 'stable'
 
   const dailyPnlPct = state.dailyGuard.equityAtOpen > 0
     ? (state.dailyGuard.realizedPnl / state.dailyGuard.equityAtOpen) * 100
@@ -302,9 +393,12 @@ export function AutoTradePanel({ active }: Props) {
             <Badge tone={state.tradingMode === 'live' ? 'red' : 'yellow'}>
               {state.tradingMode === 'live' ? 'LIVE — UANG RIIL' : 'PAPER (simulasi)'}
             </Badge>
+            <Badge tone="blue">Strategi {STRATEGY_INFO[strategy].label}</Badge>
           </span>
         }
-      />
+      >
+        {accountTabs}
+      </PanelHeader>
       <div className="px-3 py-2.5 border-b border-border space-y-2 shrink-0">
 
         <div className={cn('flex items-center gap-1.5 px-2 py-1.5 rounded-md', state.enabled ? 'bg-green-500/10' : 'bg-muted/40')}>
@@ -321,7 +415,7 @@ export function AutoTradePanel({ active }: Props) {
             <div className="text-xs font-mono text-muted-foreground">{formatIdr(state.equity, usdIdrRate)}</div>
           </div>
           <div className="rounded-md bg-muted/40 px-2 py-1.5">
-            <div className="text-xs text-muted-foreground" title="Bot berhenti buka posisi baru kalau rugi hari ini sudah -1%. Tidak ada batas untung.">PnL hari ini</div>
+            <div className="text-xs text-muted-foreground" title="Tidak ada batas rugi atau untung harian. Bot jeda 1 jam setelah 3 kali rugi berturut-turut.">PnL hari ini</div>
             <div className={cn('text-sm font-bold font-mono', dailyPnlPct >= 0 ? 'text-green-400' : 'text-red-400')}>
               {dailyPnlPct >= 0 ? '+' : ''}{dailyPnlPct.toFixed(2)}%
             </div>
@@ -396,6 +490,7 @@ export function AutoTradePanel({ active }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        <PaperVsBacktestCard trades={state.closedTrades} strategy={strategy} />
         <div className="px-3 py-2 border-b border-border/60">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
             <Activity className="h-4 w-4" />

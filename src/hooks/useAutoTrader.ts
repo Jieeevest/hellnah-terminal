@@ -7,10 +7,11 @@ import {
   disableAutoTrade,
   closeAllAutoTradePositions,
 } from '@/lib/autoTraderClient'
+import { API_URLS } from '@/constants/apiUrls'
 
 export type AutoTradeConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
-export function useAutoTrader(active: boolean) {
+export function useAutoTrader(active: boolean, baseUrl = API_URLS.trading) {
   const [state, setState] = useState<AutoTradeState | null>(null)
   const [status, setStatus] = useState<AutoTradeConnectionStatus>('connecting')
   const [actionError, setActionError] = useState<string | null>(null)
@@ -20,15 +21,17 @@ export function useAutoTrader(active: boolean) {
     if (!active) return
 
     let cancelled = false
+    setState(null)
     setStatus('connecting')
 
-    fetchAutoTradeState()
+    fetchAutoTradeState(baseUrl)
       .then((s) => { if (!cancelled) setState(s) })
       .catch(() => { /* SSE onerror di bawah yang akan set status disconnected */ })
 
     unsubscribeRef.current = subscribeAutoTradeStream(
       (s) => { setState(s); setStatus('connected') },
-      () => setStatus('disconnected')
+      () => setStatus('disconnected'),
+      baseUrl
     )
 
     return () => {
@@ -36,7 +39,7 @@ export function useAutoTrader(active: boolean) {
       unsubscribeRef.current?.()
       unsubscribeRef.current = null
     }
-  }, [active])
+  }, [active, baseUrl])
 
   const runAction = useCallback(async (fn: () => Promise<void>) => {
     setActionError(null)
@@ -47,9 +50,9 @@ export function useAutoTrader(active: boolean) {
     }
   }, [])
 
-  const enable = useCallback(() => runAction(enableAutoTrade), [runAction])
-  const disable = useCallback(() => runAction(disableAutoTrade), [runAction])
-  const closeAll = useCallback(() => runAction(closeAllAutoTradePositions), [runAction])
+  const enable = useCallback(() => runAction(() => enableAutoTrade(baseUrl)), [runAction, baseUrl])
+  const disable = useCallback(() => runAction(() => disableAutoTrade(baseUrl)), [runAction, baseUrl])
+  const closeAll = useCallback(() => runAction(() => closeAllAutoTradePositions(baseUrl)), [runAction, baseUrl])
 
   return { state, status, actionError, enable, disable, closeAll }
 }

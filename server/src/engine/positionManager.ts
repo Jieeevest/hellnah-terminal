@@ -16,10 +16,18 @@ const TIME_STOP_BARS = 8 // kalau belum sempat nyentuh TP1 sama sekali setelah N
 // kondisinya begitu udah selama ini, biar posisi gak nyangkut tanpa batas kalau gak pernah
 // profit dan gak pernah kena SL/TP1. Lihat livePositionManager.ts buat detail alasannya.
 const MAX_HOLD_BARS = 72
+// Strategi 'trailing' (CONFIG.strategy): tanpa TP tetap & tanpa TIME_STOP — begitu harga
+// jalan >= TRAIL_TRIGGER_PCT searah posisi, SL ikut harga terbaik sejauh TRAIL_PCT.
+// Backtest 6 bulan (68 koin): win 85%, +1.34%/trade vs stable +0.51%, tapi lebih rugi
+// saat pasar turun (1 tahun, 21 koin: -0.35% vs -0.10%).
+const TRAIL_TRIGGER_PCT = 0.03
+const TRAIL_PCT = 0.03
+const TRAILING_MAX_HOLD_BARS = 336
 const MAINTENANCE_MARGIN_RATE = 0.004 // estimasi konservatif — per-tier real dari leverageBracket baru masuk M4
 
+// Pakai jarak SL AWAL (SL_PCT), bukan pos.stopLoss — trailing stop menggeser stopLoss.
 function rUnit(pos: OpenPosition): number {
-  return Math.abs(pos.entry - pos.stopLoss)
+  return pos.entry * SL_PCT
 }
 
 function realizedPnlUsd(pos: OpenPosition, exitPrice: number, qty: number): number {
@@ -32,7 +40,7 @@ function recordClose(
   pos: OpenPosition,
   exitPrice: number,
   qtyClosed: number,
-  reason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'MANUAL',
+  reason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'TRAIL' | 'MANUAL',
   nowMs: number
 ) {
   const pnl = realizedPnlUsd(pos, exitPrice, qtyClosed)
@@ -50,6 +58,7 @@ function recordClose(
     rMultiple,
     openedAt: pos.openedAt,
     closedAt: nowMs,
+    strategy: pos.strategy ?? 'stable',
   })
 
   // Dicatat baik untung maupun rugi — kerugian (SL) justru data paling berguna buat
@@ -68,7 +77,7 @@ function recordClose(
   })
 }
 
-function closeFully(state: AppState, pos: OpenPosition, exitPrice: number, reason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD', nowMs: number) {
+function closeFully(state: AppState, pos: OpenPosition, exitPrice: number, reason: 'SL' | 'TP1' | 'TIME_STOP' | 'MAX_HOLD' | 'TRAIL', nowMs: number) {
   recordClose(state, pos, exitPrice, pos.qtyRemaining, reason, nowMs)
   state.symbolCooldownUntil[pos.symbol] = nowMs + HARD_LIMITS.symbolCooldownMs
 
@@ -167,7 +176,10 @@ export async function tryOpenPositions(state: AppState, candidates: ScanCandidat
     // ketolak stop_dist_out_of_range walau seharusnya valid.
     const isLong = effectiveSide === 'long'
     const stopLoss = isLong ? entryPrice * (1 - SL_PCT) : entryPrice * (1 + SL_PCT)
-    const takeProfit1 = isLong ? entryPrice * (1 + TP1_PCT) : entryPrice * (1 - TP1_PCT)
+    // Trailing: takeProfit1 diisi harga aktivasi trailing (bukan target jual) supaya tetap
+    // informatif di UI.
+    const exitPct = CONFIG.strategy === 'trailing' ? TRAIL_TRIGGER_PCT : TP1_PCT
+    const takeProfit1 = isLong ? entryPrice * (1 + exitPct) : entryPrice * (1 - exitPct)
 
     if (!flippedFromShort && candidate.side === 'short' && !HARD_LIMITS.shortEntriesEnabled) {
       // Kandidat ini LOLOS entry gate (bukan ditolak kualitas) -- dicatat ke shadow-shorts.jsonl
@@ -252,6 +264,8 @@ export async function tryOpenPositions(state: AppState, candidates: ScanCandidat
       entryContextLabel: candidate.analysis.contextLabel,
       entrySummary: candidate.analysis.summary,
       flippedFromShort,
+      strategy: CONFIG.strategy,
+      peakPrice: entryPrice,
     })
 
     appendTradeLog({
@@ -296,10 +310,35 @@ export async function tickPositions(state: AppState, log: (msg: string) => void)
 
     // Single bracket TP1/SL — SL statis (gak ada staircase/breakeven lagi), TP1 nutup
     // qty PENUH begitu kena (TP1_PORTION=1 di futuresEngine.ts), posisi langsung selesai.
+    const isTrailing = pos.strategy === 'trailing'
     const slHit = isLong ? price <= pos.stopLoss : price >= pos.stopLoss
     if (slHit) {
-      closeFully(state, pos, pos.stopLoss, 'SL', nowMs)
-      log(`SL ${pos.symbol} @ ${pos.stopLoss}`)
+      const trailLocked = isTrailing && (isLong ? pos.stopLoss > pos.entry : pos.stopLoss < pos.entry)
+      closeFully(state, pos, pos.stopLoss, trailLocked ? 'TRAIL' : 'SL', nowMs)
+      log(trailLocked ? `TRAIL ${pos.symbol} @ ${pos.stopLoss} — trailing stop kena, untung dikunci` : `SL ${pos.symbol} @ ${pos.stopLoss}`)
+      continue
+    }
+
+    const tfDurationMs = TF_DURATION_MS[pos.primaryTimeframe] ?? TF_DURATION_MS['1h']
+    const barsSinceEntry = (nowMs - pos.openedAt) / tfDurationMs
+
+    if (isTrailing) {
+      const peak = isLong ? Math.max(pos.peakPrice ?? pos.entry, price) : Math.min(pos.peakPrice ?? pos.entry, price)
+      pos.peakPrice = peak
+      const movePct = isLong ? (peak - pos.entry) / pos.entry : (pos.entry - peak) / pos.entry
+      if (movePct >= TRAIL_TRIGGER_PCT) {
+        const trailStop = isLong ? peak * (1 - TRAIL_PCT) : peak * (1 + TRAIL_PCT)
+        if (isLong ? trailStop > pos.stopLoss : trailStop < pos.stopLoss) pos.stopLoss = trailStop
+      }
+      if (barsSinceEntry >= TRAILING_MAX_HOLD_BARS) {
+        closeFully(state, pos, price, 'MAX_HOLD', nowMs)
+        log(`MAX_HOLD ${pos.symbol} @ ${price} — udah ${TRAILING_MAX_HOLD_BARS} jam nyangkut, ditutup paksa`)
+        continue
+      }
+      pos.markPrice = price
+      pos.unrealizedPnlUsd = realizedPnlUsd(pos, price, pos.qtyRemaining)
+      pos.unrealizedPnlPct = pos.margin > 0 ? (pos.unrealizedPnlUsd / pos.margin) * 100 : 0
+      stillOpen.push(pos)
       continue
     }
 
@@ -314,8 +353,6 @@ export async function tickPositions(state: AppState, log: (msg: string) => void)
     // masih rugi/flat, dibiarin jalan terus ke arah SL/TP1 natural, gak dipotong pas lagi
     // di bawah (backtest nunjukkin TIME_STOP tanpa syarat ini justru bikin expectancy minus,
     // banyak motong posisi yang kalau dibiarin jalan ternyata nyampe TP1).
-    const tfDurationMs = TF_DURATION_MS[pos.primaryTimeframe] ?? TF_DURATION_MS['1h']
-    const barsSinceEntry = (nowMs - pos.openedAt) / tfDurationMs
     if (barsSinceEntry >= TIME_STOP_BARS) {
       const isProfitable = isLong ? price > pos.entry : price < pos.entry
       if (isProfitable) {
