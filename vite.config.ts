@@ -22,16 +22,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '/rss',
       },
-      '/dev-proxy/lunarcrush': {
-        target: 'https://lunarcrush.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace('/dev-proxy/lunarcrush', '/api4'),
-      },
-      '/dev-proxy/coinglass': {
-        target: 'https://open-api.coinglass.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace('/dev-proxy/coinglass', '/public/v2'),
-      },
     },
   },
 })

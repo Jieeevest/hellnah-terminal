@@ -27,49 +27,6 @@ export async function fetchCandles(
           low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
         }))
       }
-      case 'kucoin': {
-        if (marketType === 'futures') {
-          const gran = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240 }[interval]!
-          const to = Date.now()
-          const from = to - gran * 60 * 1000 * 150
-          const { data } = await axios.get(`${API_URLS.kucoin.futures}/kline/query`, {
-            params: { symbol, granularity: gran, from, to },
-          })
-          return ((data?.data ?? []) as any[]).map((d: any) => ({
-            time: d[0], open: parseFloat(d[1]), high: parseFloat(d[3]),
-            low: parseFloat(d[4]), close: parseFloat(d[2]), volume: parseFloat(d[5]),
-          }))
-        } else {
-          const type = { '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1hour', '4h': '4hour' }[interval]!
-          const { data } = await axios.get(`${API_URLS.kucoin.spot}/market/candles`, {
-            params: { symbol, type },
-          })
-          return ((data?.data ?? []) as any[]).reverse().map((d: any) => ({
-            time: parseInt(d[0]) * 1000, open: parseFloat(d[1]), close: parseFloat(d[2]),
-            high: parseFloat(d[3]), low: parseFloat(d[4]), volume: parseFloat(d[5]),
-          }))
-        }
-      }
-      case 'okx': {
-        const bar = { '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H' }[interval]!
-        const { data } = await axios.get(`${API_URLS.okx.market}/candles`, {
-          params: { instId: symbol, bar, limit: 150 },
-        })
-        return ((data?.data ?? []) as any[]).reverse().map((d: any) => ({
-          time: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
-          low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
-        }))
-      }
-      case 'cryptocom': {
-        const { data } = await axios.get(
-          `${API_URLS.cryptoCom.public}/get-candlestick`,
-          { params: { instrument_name: symbol, timeframe: interval, count: 150 } }
-        )
-        return ((data?.result?.data ?? []) as any[]).reverse().map((d: any) => ({
-          time: d.t, open: parseFloat(d.o), high: parseFloat(d.h),
-          low: parseFloat(d.l), close: parseFloat(d.c), volume: parseFloat(d.v),
-        }))
-      }
     }
   } catch {
     return []

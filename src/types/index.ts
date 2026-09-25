@@ -1,4 +1,4 @@
-export type Exchange = 'binance' | 'cryptocom' | 'kucoin' | 'okx'
+export type Exchange = 'binance'
 export type MarketType = 'spot' | 'futures'
 
 export interface Ticker {

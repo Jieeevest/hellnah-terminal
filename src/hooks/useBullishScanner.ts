@@ -54,52 +54,6 @@ async function fetchCandleTf(
           low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
         }))
       }
-      case 'kucoin': {
-        if (marketType === 'futures') {
-          const granMap: Record<string, number> = { '15m': 15, '30m': 30, '1h': 60, '4h': 240 }
-          const to = Date.now()
-          const from = to - 60 * 1000 * granMap[tf] * 150
-          const { data } = await axios.get(`${API_URLS.kucoin.futures}/kline/query`, {
-            params: { symbol, granularity: granMap[tf], from, to },
-            timeout: 8000,
-          })
-          return ((data?.data ?? []) as any[]).map((d: any) => ({
-            time: d[0], open: parseFloat(d[1]), high: parseFloat(d[3]),
-            low: parseFloat(d[4]), close: parseFloat(d[2]), volume: parseFloat(d[5]),
-          }))
-        } else {
-          const typeMap: Record<string, string> = { '15m': '15min', '30m': '30min', '1h': '1hour', '4h': '4hour' }
-          const { data } = await axios.get(`${API_URLS.kucoin.spot}/market/candles`, {
-            params: { symbol, type: typeMap[tf] },
-            timeout: 8000,
-          })
-          return ((data?.data ?? []) as any[]).reverse().map((d: any) => ({
-            time: parseInt(d[0]) * 1000, open: parseFloat(d[1]), close: parseFloat(d[2]),
-            high: parseFloat(d[3]), low: parseFloat(d[4]), volume: parseFloat(d[5]),
-          }))
-        }
-      }
-      case 'okx': {
-        const barMap: Record<string, string> = { '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H' }
-        const { data } = await axios.get(`${API_URLS.okx.market}/candles`, {
-          params: { instId: symbol, bar: barMap[tf], limit: 150 },
-          timeout: 8000,
-        })
-        return ((data?.data ?? []) as any[]).reverse().map((d: any) => ({
-          time: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
-          low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
-        }))
-      }
-      case 'cryptocom': {
-        const { data } = await axios.get(
-          `${API_URLS.cryptoCom.public}/get-candlestick`,
-          { params: { instrument_name: symbol, timeframe: tf, count: 150 }, timeout: 8000 }
-        )
-        return ((data?.result?.data ?? []) as any[]).reverse().map((d: any) => ({
-          time: d.t, open: parseFloat(d.o), high: parseFloat(d.h),
-          low: parseFloat(d.l), close: parseFloat(d.c), volume: parseFloat(d.v),
-        }))
-      }
     }
   } catch {
     return []
@@ -176,6 +130,9 @@ export function useBullishScanner(
 
           const signal = generateMTFSignal(candlesMap, fgData?.value ?? null, ticker.fundingRate ?? null)
           if (!signal) return null
+          // Confidence gate: sinyal Neutral (bullishPct 45-55) nggak punya edge tervalidasi
+          // di backtest — jangan dipaksa masuk list, biar list beneran cuma isi setup kuat.
+          if (signal.label === 'Neutral') return null
 
           const futuresSetup = marketType === 'futures'
             ? analyzeFuturesSetup(ticker, signal, candlesMap, maxVolume, maxOpenInterest)

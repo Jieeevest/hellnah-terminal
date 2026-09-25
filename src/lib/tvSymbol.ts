@@ -38,9 +38,6 @@ export function getTVSources(
   // Put the currently selected exchange first
   const primaryLabel: Record<Exchange, string> = {
     binance: 'Binance',
-    cryptocom: 'Binance',   // Crypto.com has very limited TV coverage → fallback ke Binance
-    kucoin: 'KuCoin',
-    okx: 'OKX',
   }
 
   const preferred = primaryLabel[exchange]
