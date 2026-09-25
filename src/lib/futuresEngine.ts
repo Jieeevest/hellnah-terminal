@@ -8,10 +8,19 @@ export interface FuturesTradePlan {
   openHigh: number
   stopLoss: number
   takeProfit1: number
-  takeProfit2: number
   riskReward: number
   note: string
 }
+
+// SL/TP persentase tetap dari harga masuk — bukan ATR/support-resistance lagi. Single
+// bracket TP1/SL (bukan staircase TP1/TP2/TP3 lagi) — TP1 kena -> qty ditutup PENUH
+// (TP1_PORTION=1.0), gak ada tahap lanjutan buat dikunci bertahap.
+// SL 20%/TP 3% dari grid backtest 25 Sep 2026 (win rate uji 84%, avg +0.25%/trade uji,
+// +0.14% latih; sinyal dibalik -0.98%). SL selebar ini aman cuma karena akun pakai CROSS margin dan total margin
+// bot dibatasi HARD_LIMITS.maxTotalMarginPct — di isolated 5x posisi keburu likuidasi.
+export const SL_PCT = 0.2
+export const TP1_PCT = 0.03
+export const TP1_PORTION = 1
 
 export interface FuturesSetupAnalysis {
   side: 'long' | 'short'
@@ -29,6 +38,8 @@ export interface FuturesSetupAnalysis {
   invalidationReason: string
   primaryPlan: FuturesTradePlan | null
   tradePlans: Partial<Record<Timeframe, FuturesTradePlan>>
+  atr: number
+  alignment: number
 }
 
 function normalizeLogMetric(value: number | undefined, maxValue: number) {
@@ -58,7 +69,7 @@ function clampPrice(value: number) {
   return value > 0 ? value : 0
 }
 
-function calcAtrApprox(candles: Candle[], period = 14) {
+export function calcAtrApprox(candles: Candle[], period = 14) {
   if (candles.length < 2) return 0
 
   const trs = candles.slice(1).map((candle, index) => {
@@ -75,7 +86,7 @@ function calcAtrApprox(candles: Candle[], period = 14) {
   return slice.reduce((sum, value) => sum + value, 0) / slice.length
 }
 
-function getTimeframeAlignment(
+export function getTimeframeAlignment(
   candlesMap: Record<string, Candle[]>,
   side: 'long' | 'short'
 ) {
@@ -97,7 +108,7 @@ function getTimeframeAlignment(
   return checked > 0 ? aligned / checked : 0
 }
 
-function buildTradePlan(
+export function buildTradePlan(
   timeframe: Timeframe,
   candles: Candle[],
   side: 'long' | 'short',
@@ -109,50 +120,43 @@ function buildTradePlan(
   const recent = candles.slice(-20)
   const fast = candles.slice(-8)
   const support = Math.min(...recent.map((candle) => candle.low))
-  const resistance = Math.max(...recent.map((candle) => candle.high))
   const fastSupport = Math.min(...fast.map((candle) => candle.low))
   const fastResistance = Math.max(...fast.map((candle) => candle.high))
   const atr = calcAtrApprox(candles)
   const volatility = atr || Math.max(last.close * 0.008, 0.00000001)
   const stretched = combinedScore >= 72
 
+  // Zona entry (openLow-openHigh) tetap dari struktur teknikal (nunggu pullback/bounce) —
+  // yang berubah cuma SL/TP setelah masuk, sekarang persentase tetap dari entryRef (ujung
+  // zona yang paling dalam, konfirmasi paling kuat) bukan ATR/support-resistance lagi.
   if (side === 'long') {
     const openHigh = Math.min(last.close, fastSupport + (volatility * (stretched ? 0.35 : 0.55)))
     const openLow = Math.max(support, openHigh - (volatility * (stretched ? 0.55 : 0.8)))
-    const stopLoss = Math.max(support - (volatility * 0.45), openLow - (volatility * 0.95))
-    const takeProfit1 = Math.max(fastResistance, openHigh + (volatility * 1.2))
-    const takeProfit2 = Math.max(resistance, openHigh + (volatility * 2))
-    const risk = Math.max(openHigh - stopLoss, 0.00000001)
-    const reward = Math.max(takeProfit2 - openHigh, 0)
+    const entryRef = openLow
     return {
       timeframe,
       openLow: clampPrice(openLow),
       openHigh: clampPrice(Math.max(openHigh, openLow)),
-      stopLoss: clampPrice(Math.min(stopLoss, openLow)),
-      takeProfit1: clampPrice(Math.max(takeProfit1, openHigh)),
-      takeProfit2: clampPrice(Math.max(takeProfit2, takeProfit1)),
-      riskReward: Math.round((reward / risk) * 100) / 100,
+      stopLoss: clampPrice(entryRef * (1 - SL_PCT)),
+      takeProfit1: clampPrice(entryRef * (1 + TP1_PCT)),
+      riskReward: Math.round((TP1_PCT / SL_PCT) * 100) / 100,
       note: stretched
         ? 'Harga sudah agak naik. Lebih aman tunggu pullback ke area open.'
         : 'Harga masih relatif dekat area support untuk rencana long.',
     }
   }
 
+  const resistance = Math.max(...recent.map((candle) => candle.high))
   const openLow = Math.max(last.close, fastResistance - (volatility * (stretched ? 0.35 : 0.55)))
   const openHigh = Math.min(resistance, openLow + (volatility * (stretched ? 0.55 : 0.8)))
-  const stopLoss = Math.min(resistance + (volatility * 0.45), openHigh + (volatility * 0.95))
-  const takeProfit1 = Math.min(fastSupport, openLow - (volatility * 1.2))
-  const takeProfit2 = Math.min(support, openLow - (volatility * 2))
-  const risk = Math.max(stopLoss - openLow, 0.00000001)
-  const reward = Math.max(openLow - takeProfit2, 0)
+  const entryRef = openHigh
   return {
     timeframe,
     openLow: clampPrice(Math.min(openLow, openHigh)),
     openHigh: clampPrice(openHigh),
-    stopLoss: clampPrice(Math.max(stopLoss, openHigh)),
-    takeProfit1: clampPrice(Math.min(takeProfit1, openLow)),
-    takeProfit2: clampPrice(Math.min(takeProfit2, takeProfit1)),
-    riskReward: Math.round((reward / risk) * 100) / 100,
+    stopLoss: clampPrice(entryRef * (1 + SL_PCT)),
+    takeProfit1: clampPrice(entryRef * (1 - TP1_PCT)),
+    riskReward: Math.round((TP1_PCT / SL_PCT) * 100) / 100,
     note: stretched
       ? 'Tekanan turun sudah berjalan. Entry short lebih aman saat harga memantul ke area open.'
       : 'Harga masih dekat area resistance untuk rencana short.',
@@ -192,7 +196,12 @@ export function analyzeFuturesSetup(
   candlesMap: Record<string, Candle[]>,
   maxVolume: number,
   maxOpenInterest: number
-): FuturesSetupAnalysis {
+): FuturesSetupAnalysis | null {
+  // Confidence gate: backtest walk-forward (scripts/backtest-signals.mjs) nunjukin
+  // sinyal di zona Neutral (bullishPct 45-55) nggak punya edge tervalidasi — daripada
+  // dipaksa pilih long/short kayak sebelumnya, mending nggak kasih setup sama sekali.
+  if (signal.label === 'Neutral') return null
+
   const longBias = signal.bullishPct
   const shortBias = 100 - signal.bullishPct
   const liquidityScore = normalizeLogMetric(ticker.volume, maxVolume) * 100
@@ -220,8 +229,11 @@ export function analyzeFuturesSetup(
     ? signal.trend === 'Uptrend' ? 1 : signal.trend === 'Sideways' ? 0.55 : 0.2
     : signal.trend === 'Downtrend' ? 1 : signal.trend === 'Sideways' ? 0.55 : 0.2
 
+  // Rentang clamp (36-70) mengikuti hit-rate riil yang terukur di backtest walk-forward
+  // (scripts/backtest-signals.mjs, out-of-sample ~54% agregat, 36-70% per-simbol) — bukan
+  // angka sembarangan lagi. Tetap heuristik komposit, bukan win-rate historis per coin ini.
   const accuracyPct = Math.round(
-    Math.max(35, Math.min(92,
+    Math.max(36, Math.min(70,
       (edgeScore * 0.55) +
       (alignment * 100 * 0.25) +
       (fundingSupport * 100 * 0.1) +
@@ -230,8 +242,8 @@ export function analyzeFuturesSetup(
   )
 
   const confidenceLabel =
-    accuracyPct >= 78 ? 'High'
-    : accuracyPct >= 63 ? 'Medium'
+    accuracyPct >= 60 ? 'High'
+    : accuracyPct >= 48 ? 'Medium'
     : 'Low'
 
   const primaryFundingScore = side === 'long' ? scoreFundingForLong(ticker.fundingRate) : scoreFundingForShort(ticker.fundingRate)
@@ -258,6 +270,7 @@ export function analyzeFuturesSetup(
 
   const tradePlans = buildTradePlans(candlesMap, signal, side)
   const primaryPlan = tradePlans['1h'] ?? tradePlans['30m'] ?? tradePlans['4h'] ?? tradePlans['15m'] ?? null
+  const primaryAtr = primaryPlan ? calcAtrApprox(candlesMap[primaryPlan.timeframe] ?? []) : 0
   const riskLabel =
     !primaryPlan ? 'High'
     : primaryPlan.riskReward >= 1.8 ? 'Low'
@@ -304,5 +317,7 @@ export function analyzeFuturesSetup(
     invalidationReason,
     primaryPlan,
     tradePlans,
+    atr: primaryAtr,
+    alignment,
   }
 }

@@ -213,8 +213,15 @@ export function generateSignal(candles: Candle[]): SignalResult | null {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// WEIGHTED SIGNAL ENGINE — sesuai docs-analisis.md
-// Formula: Price 30% + Volume 20% + Technical 35% + Sentiment 15%
+// WEIGHTED SIGNAL ENGINE
+// Formula: Price 50% + Technical 20% + Volume 15% + Sentiment 15%
+// Bobot direfit dari backtest walk-forward (scripts/backtest-signals.mjs, 18 coin,
+// candle 4h, ~6 bulan): RSI & BB (kategori Price) terbukti punya edge ~57% hit-rate
+// di training window, sedangkan MACD/EMA (Technical) dan Volume/OBV terbukti TIDAK
+// ada edge (~43-47%, di bawah/setara coin-flip) — makanya bobotnya diturunkan drastis
+// dari versi awal (Technical 35%, Volume 20%) yang cuma hand-picked dari dokumen desain
+// tanpa validasi historis. Sentiment tidak ikut diuji (perlu data Fear&Greed historis
+// per-candle yang tidak tersedia di backtest ini) jadi bobotnya dibiarkan seperti semula.
 // Output: bullishPct (0–100%) + label
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -425,10 +432,10 @@ export function generateWeightedSignal(
   const lcSentS    = scoreLCSentiment(lcSentiment)
   const hasLC      = lcGalaxyScore !== null && lcSentiment !== null
 
-  // ── Step 1: Skor per kategori (docs-analisis.md) ─────────────────────
-  const scorePrice = rsiScore  * 0.5 + bbScore  * 0.5
-  const scoreVol   = volScore  * 0.5 + obvScore * 0.5
-  const scoreTech  = macdScore * 0.4 + emaScore * 0.6
+  // ── Step 1: Skor per kategori (bobot sub-komponen direfit dari backtest) ──
+  const scorePrice = rsiScore  * 0.5  + bbScore  * 0.5
+  const scoreVol   = volScore  * 0.35 + obvScore * 0.65   // OBV lebih ada edge daripada rasio volume
+  const scoreTech  = macdScore * 0.55 + emaScore * 0.45   // EMA paling tidak ada edge di data historis
 
   // Sentiment: blending Fear&Greed + LunarCrush (jika tersedia) + Funding (futures)
   const scoreSentiment = (() => {
@@ -443,11 +450,24 @@ export function generateWeightedSignal(
 
   // ── Step 2: Weighted aggregate ────────────────────────────────────────
   let rawSignal =
-    scorePrice     * 0.30 +
-    scoreVol       * 0.20 +
-    scoreTech      * 0.35 +
+    scorePrice     * 0.50 +
+    scoreTech      * 0.20 +
+    scoreVol       * 0.15 +
     scoreSentiment * 0.15
   rawSignal = clamp1(rawSignal)
+
+  // ── Step 2b: Chase/extension guard ──────────────────────────────────────
+  // Semua indikator di atas sifatnya lagging (baru kasih skor tinggi setelah
+  // pergerakan terjadi), jadi tanpa ini scanner cenderung nyorong coin yang
+  // harganya sudah dekat/lewat band atas — entry telat di dekat local top/bottom.
+  // pctInBand: 0 = di band bawah, 1 = di band atas (posisi harga dalam range BB).
+  const bandWidthAbs = bbUpper - bbLower
+  const pctInBand = bandWidthAbs > 0 ? (lastClose - bbLower) / bandWidthAbs : 0.5
+  if (rawSignal > 0 && pctInBand > 0.8) {
+    rawSignal *= lerp(1, 0.5, Math.min((pctInBand - 0.8) / 0.3, 1))
+  } else if (rawSignal < 0 && pctInBand < 0.2) {
+    rawSignal *= lerp(1, 0.5, Math.min((0.2 - pctInBand) / 0.3, 1))
+  }
 
   // ── Step 3: Konversi ke % bullish ─────────────────────────────────────
   let bullishPct = ((rawSignal + 1) / 2) * 100
@@ -496,16 +516,6 @@ export interface MTFSignalResult {
   }>>
 }
 
-function directionToScore(dir: Direction): number {
-  switch (dir) {
-    case 'STRONG_BUY': return 100
-    case 'BUY': return 75
-    case 'NEUTRAL': return 50
-    case 'SELL': return 25
-    case 'STRONG_SELL': return 0
-  }
-}
-
 export function generateMTFSignal(
   candlesMap: Record<string, Candle[]>,
   fgValue: number | null = null,
@@ -531,12 +541,15 @@ export function generateMTFSignal(
     
     if (!classic || !weighted) continue
 
-    const classicScore = directionToScore(classic.direction)
     const weightedScore = weighted.bullishPct
 
-    // Gabungkan metode Classic (40%) dan Weighted (60%) untuk TF ini
-    const combinedScore = (classicScore * 0.4) + (weightedScore * 0.6)
-    
+    // Blend rasio Classic/Weighted disweep di backtest walk-forward (scripts/backtest-signals.mjs):
+    // hasilnya monoton — makin besar porsi Classic, makin turun hit-rate, baik di TRAIN maupun
+    // TEST (Classic sendirian: 43-45%, di bawah coin-flip). Classic tidak dipakai untuk skor lagi,
+    // classicDirection cuma disimpan di breakdown buat transparansi, trend tetap dari Classic
+    // (dipakai sebagai deskripsi struktur, bukan buat scoring).
+    const combinedScore = weightedScore
+
     breakdown[tf as Timeframe] = {
       classicDirection: classic.direction,
       weightedPct: weighted.bullishPct,
