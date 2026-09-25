@@ -1,0 +1,56 @@
+services:
+  trading-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: hellnah-trading-server
+    restart: unless-stopped
+    env_file:
+      - server/.env
+    environment:
+      # Server default bind ke 127.0.0.1 — di dalam container harus 0.0.0.0 supaya service
+      # `fe` bisa nyambung. Tetap gak terekspos ke host karena sengaja gak ada `ports:`.
+      HOST: 0.0.0.0
+    volumes:
+      - trading-data:/app/server/data
+    # Sengaja TANPA `ports:` — backend TIDAK diekspos ke host/internet sama sekali.
+    # Cuma bisa diakses dari container lain di network compose ini (service `fe` di bawah,
+    # lewat nama service "trading-server" sebagai hostname internal).
+    # DNS fapi.binance.com di-hijack ISP (VPS ini di Jakarta) ke domain blokir Kominfo
+    # (lamanlabuh.aduankonten.id) — bahkan lewat 8.8.8.8/1.1.1.1 sekalipun (transparent
+    # DNS hijack di jalur transit, bukan cuma resolver lokal). IP tujuan aslinya (CloudFront)
+    # TIDAK diblokir — override /etc/hosts container ke IP itu langsung buat bypass DNS-nya.
+    # RAPUH: IP CloudFront ini bisa berubah sewaktu-waktu (rotasi AWS) — kalau scan cycle
+    # error "Unable to connect" muncul lagi, cek dulu apa IP-IP ini masih valid
+    # (`dig fapi.binance.com @1.1.1.1` dari jaringan yang gak kena hijack).
+    extra_hosts:
+      - "fapi.binance.com:54.192.164.117"
+      - "fapi.binance.com:54.192.164.11"
+      - "fapi.binance.com:54.192.164.47"
+      - "fapi.binance.com:54.192.164.36"
+
+  fe:
+    build:
+      context: .
+      dockerfile: Dockerfile.fe
+      args:
+        # Dari .env di root repo (docker compose otomatis baca file itu buat substitusi
+        # ${...} di sini) — bukan dari server/.env. Harus SAMA PERSIS dengan
+        # CONTROL_API_TOKEN di server/.env, kalau enggak FE bakal ke-401 terus.
+        VITE_TRADING_API_TOKEN: ${VITE_TRADING_API_TOKEN}
+    container_name: hellnah-trading-fe
+    restart: unless-stopped
+    ports:
+      # Dibind ke IP Tailscale VPS ini SAJA (100.110.53.6), bukan 0.0.0.0 — dashboard gak
+      # bisa diakses dari internet publik sama sekali lagi, cuma dari device yang udah
+      # gabung ke tailnet yang sama. Sengaja gak pakai ufw/iptables (Docker suka bypass
+      # aturan ufw lewat iptables-nya sendiri buat published ports) — bind ke IP spesifik
+      # di sini yang diproses Docker langsung, jauh lebih reliable.
+      # CATATAN: kalau VPS ini di-reset/register ulang ke Tailscale, IP-nya bisa beda —
+      # cek `tailscale ip -4` dan update baris ini kalau port gak nyambung lagi.
+      - "100.110.53.6:8090:80"
+    depends_on:
+      - trading-server
+
+volumes:
+  trading-data:

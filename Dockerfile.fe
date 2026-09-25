@@ -1,0 +1,26 @@
+# Build dashboard (termasuk AutoTradePanel) jadi static site, di-serve nginx yang juga
+# reverse-proxy /api-trading/ ke service `trading-server` (nama service di docker-compose,
+# resolve otomatis lewat internal Docker network) — backend nggak perlu diekspos ke
+# internet sama sekali, cuma container FE ini yang publik.
+FROM oven/bun:1 AS build
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install
+COPY . .
+ENV VITE_TRADING_API_URL=/api-trading
+# DEV_MODE=1 -> connect langsung ke Binance dkk (bukan lewat domain proxy hellnah-terminal.id
+# yang nggak ada di deployment standalone ini). Panel yang butuh proxy CORS (News/LunarCrush/
+# CoinGlass) tetap jalan karena nginx-fe.conf replikasi rute /dev-proxy/* dari vite.config.ts.
+ENV VITE_DEV_MODE=1
+# Build ARG (bukan hardcode di sini) — nilai asli datang dari .env root lewat build.args di
+# docker-compose.yml, gak pernah masuk ke history image/Dockerfile. CATATAN: token ini
+# ke-inline ke bundle JS publik (dibaca browser), jadi cuma nahan scanner/bot yang asal nembak
+# endpoint tanpa cek — BUKAN proteksi penuh dari orang yang sengaja buka DevTools/view-source.
+ARG VITE_TRADING_API_TOKEN
+ENV VITE_TRADING_API_TOKEN=$VITE_TRADING_API_TOKEN
+RUN bun run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx-fe.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
