@@ -13,6 +13,7 @@ import { calcFibRetracement, formatFibRatio } from '@/lib/fibonacci'
 import { analyzeSmc } from '@/lib/smc'
 import { SmcPrimitive } from '@/lib/smcPrimitive'
 import { getVerdict, planEntryRef, VerdictBanner } from '@/components/TradeVerdict'
+import { useBtcRegime } from '@/hooks/useBtcRegime'
 import { cn, formatPrice } from '@/lib/utils'
 
 interface Props {
@@ -84,6 +85,7 @@ function Toggle({ active, onClick, color, children }: { active: boolean; onClick
 }
 
 export function PlanChart({ symbol, marketType, currentPrice, futuresTickers }: Props) {
+  const regime = useBtcRegime()
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -253,7 +255,7 @@ export function PlanChart({ symbol, marketType, currentPrice, futuresTickers }: 
           ) : setupStatus === 'unavailable' ? (
             <p className="text-xs text-muted-foreground">Koin ini tidak ada di Binance Futures — garis rencana tidak tersedia.</p>
           ) : setup ? (
-            <VerdictBanner verdict={getVerdict(setup, price)} />
+            <VerdictBanner verdict={getVerdict(setup, price, regime)} />
           ) : (
             <p className="text-xs text-muted-foreground">Belum ada setup Long/Short yang cukup kuat — garis rencana tidak digambar.</p>
           )}

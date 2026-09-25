@@ -1,13 +1,14 @@
-import { CheckCircle2, Hourglass, PauseCircle, XCircle } from 'lucide-react'
+import { Ban, CheckCircle2, Hourglass, PauseCircle, XCircle } from 'lucide-react'
 import type { FuturesOpportunity } from '@/hooks/useFuturesOpportunities'
 import { cn, formatPrice } from '@/lib/utils'
+import type { BtcRegime } from '@/hooks/useBtcRegime'
 
 // Scanner ini buat trading manual — ambang kualitasnya sengaja dipinjam dari
 // DEFAULT_ENTRY_GATE_THRESHOLDS (server/src/strategy/entryGate.ts) karena sudah dikalibrasi.
 const QUALITY_GATE = { minScore: 60, minAccuracy: 55, minAlignment: 0.35, minVolume: 100_000_000 }
 const ZONE_TOLERANCE = 0.0015
 
-export type VerdictKind = 'enter' | 'wait-price' | 'wait-signal' | 'invalid'
+export type VerdictKind = 'enter' | 'wait-price' | 'wait-signal' | 'avoid' | 'invalid'
 
 export interface Verdict {
   kind: VerdictKind
@@ -20,10 +21,11 @@ const VERDICT_STYLE: Record<VerdictKind, { box: string; icon: typeof CheckCircle
   enter: { box: 'bg-green-500/15 border-green-500/40 text-green-400', icon: CheckCircle2 },
   'wait-price': { box: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400', icon: Hourglass },
   'wait-signal': { box: 'bg-muted/40 border-border text-muted-foreground', icon: PauseCircle },
+  avoid: { box: 'bg-orange-500/10 border-orange-500/30 text-orange-400', icon: Ban },
   invalid: { box: 'bg-red-500/10 border-red-500/30 text-red-400', icon: XCircle },
 }
 
-export const VERDICT_ORDER: Record<VerdictKind, number> = { enter: 0, 'wait-price': 1, 'wait-signal': 2, invalid: 3 }
+export const VERDICT_ORDER: Record<VerdictKind, number> = { enter: 0, 'wait-price': 1, 'wait-signal': 2, avoid: 3, invalid: 4 }
 
 // SL/TP di futuresEngine dihitung dari tepi zona yang paling dalam (long: openLow, short: openHigh),
 // bukan dari tepi yang dekat — masuk di tepi dekat bisa bikin target ada di sisi yang salah.
@@ -36,12 +38,20 @@ export function hasReachedEntry(item: FuturesOpportunity, price: number): boolea
   return item.side === 'long' ? price <= ref * (1 + ZONE_TOLERANCE) : price >= ref * (1 - ZONE_TOLERANCE)
 }
 
-export function getVerdict(item: FuturesOpportunity, price: number): Verdict {
+export function getVerdict(item: FuturesOpportunity, price: number, regime?: BtcRegime | null): Verdict {
   const isLong = item.side === 'long'
   const { stopLoss } = item.primaryPlan
 
   if (isLong ? price <= stopLoss : price >= stopLoss) {
     return { kind: 'invalid', title: 'Batal', detail: 'Harga sudah melewati batas rugi — setup ini tidak berlaku lagi', reasons: [] }
+  }
+
+  // Backtest 2 tahun: short rugi kecuali saat pasar turun, long paling rugi saat pasar turun.
+  if (regime && !isLong && regime.kind !== 'bear') {
+    return { kind: 'avoid', title: 'Tidak disarankan', detail: 'Pasar tidak sedang turun — sinyal short rugi di backtest kecuali saat BTC turun', reasons: [] }
+  }
+  if (regime && isLong && regime.kind === 'bear') {
+    return { kind: 'avoid', title: 'Tidak disarankan', detail: `BTC turun ${regime.drawdownPct.toFixed(1)}% dari puncak 30 hari — bot juga berhenti buka posisi baru`, reasons: [] }
   }
 
   const reasons: string[] = []

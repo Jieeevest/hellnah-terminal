@@ -11,6 +11,7 @@ import { PanelHeader } from '@/components/ui/PanelHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { formatFibRatio } from '@/lib/fibonacci'
 import { getVerdict, hasReachedEntry, planEntryRef, VerdictBanner, VERDICT_ORDER, type Verdict } from '@/components/TradeVerdict'
+import { useBtcRegime, type BtcRegimeKind } from '@/hooks/useBtcRegime'
 
 interface Props {
   tickers: Ticker[]
@@ -26,6 +27,12 @@ type FundingFilter = 'all' | 'negative' | 'positive'
 
 // R:R sengaja gak dijadikan filter: SL/TP di futuresEngine persentase tetap (TP 3% / SL 20%),
 // jadi R:R semua kandidat selalu sama (0.15) — filter lama "R:R ≥ 1.2" bikin hasil selalu kosong.
+const REGIME_INFO: Record<BtcRegimeKind, { label: string; tone: BadgeTone; hint: string }> = {
+  bull: { label: 'Pasar naik', tone: 'green', hint: 'fokus long, short tidak disarankan' },
+  neutral: { label: 'Pasar datar', tone: 'yellow', hint: 'long hati-hati, short tidak disarankan' },
+  bear: { label: 'Pasar turun', tone: 'red', hint: 'long tidak disarankan, short boleh dipertimbangkan' },
+}
+
 const PRESETS: Record<Preset, { label: string; hint: string; minAccuracy: number; blockHighRisk: boolean; blockCrowded: boolean }> = {
   safe: { label: 'Aman', hint: 'Skor keyakinan ≥ 65%, risiko & keramaian tidak tinggi', minAccuracy: 65, blockHighRisk: true, blockCrowded: true },
   balanced: { label: 'Seimbang', hint: 'Skor keyakinan ≥ 55%, tidak terlalu ramai', minAccuracy: 55, blockHighRisk: false, blockCrowded: true },
@@ -238,6 +245,7 @@ export function FuturesOpportunitiesPanel({ tickers, exchange, active = false, o
   }
   const { opportunities, status, progress, scannedCount, totalCount, lastRunAt, runScan, cancelScan } =
     useFuturesOpportunities(tickers, exchange)
+  const regime = useBtcRegime()
 
   useEffect(() => {
     if (!active || !tickers.length) return
@@ -275,7 +283,7 @@ export function FuturesOpportunitiesPanel({ tickers, exchange, active = false, o
   const filtered = (sideFilter === 'all' ? presetFiltered : presetFiltered.filter((o) => o.side === sideFilter))
     .map((item) => {
       const price = livePrice.get(item.ticker.symbol) ?? item.ticker.price
-      return { item, price, verdict: getVerdict(item, price) }
+      return { item, price, verdict: getVerdict(item, price, regime) }
     })
     .sort((a, b) => VERDICT_ORDER[a.verdict.kind] - VERDICT_ORDER[b.verdict.kind] || b.item.accuracyPct - a.item.accuracyPct)
   const readyCount = filtered.filter((f) => f.verdict.kind === 'enter').length
@@ -313,9 +321,18 @@ export function FuturesOpportunitiesPanel({ tickers, exchange, active = false, o
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0 mt-0.5" />
           <span>
-            &quot;Skor&quot; = keyakinan mesin, bukan peluang menang. Backtest 3 tahun: mesin ini belum terbukti lebih baik dari acak (uji −0,09R/trade) — anggap kandidat, bukan jaminan. Lihat Analisa → Hasil Backtest.
+            &quot;Skor&quot; = keyakinan mesin, bukan peluang menang. Backtest: hasil sangat tergantung kondisi pasar — anggap kandidat, bukan jaminan. Lihat Analisa → Hasil Backtest.
           </span>
         </p>
+
+        {regime && (
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            <Badge tone={REGIME_INFO[regime.kind].tone}>{REGIME_INFO[regime.kind].label}</Badge>
+            <span>
+              BTC {formatPrice(regime.price)} · {regime.drawdownPct.toFixed(1)}% di bawah puncak 30 hari · {regime.price > regime.sma50d ? 'di atas' : 'di bawah'} rata-rata 50 hari → {REGIME_INFO[regime.kind].hint}
+            </span>
+          </p>
+        )}
 
         {status === 'scanning' && (
           <div className="h-1 rounded-full bg-muted overflow-hidden">

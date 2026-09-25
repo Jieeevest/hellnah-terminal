@@ -9,6 +9,7 @@ import { cn, formatNumber, formatPrice } from '@/lib/utils'
 import { CoinIcon } from '@/components/CoinIcon'
 import { useFuturesSetup } from '@/hooks/useFuturesOpportunities'
 import { getVerdict, planEntryRef, VerdictBanner } from '@/components/TradeVerdict'
+import { useBtcRegime } from '@/hooks/useBtcRegime'
 
 interface Props {
   ticker: Ticker | null
@@ -124,6 +125,7 @@ function StatTile({ label, value, tone }: { label: string; value: string; tone?:
 }
 
 export function CoinSummary({ ticker, currentPrice, exchange, marketType, botState, futuresTickers, onShowChart, onOpenAnalysis, onOpenBot }: Props) {
+  const regime = useBtcRegime()
   const [candles, setCandles] = useState<Candle[]>([])
   const symbol = ticker?.symbol ?? ''
 
@@ -276,7 +278,7 @@ export function CoinSummary({ ticker, currentPrice, exchange, marketType, botSta
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">{setup.oneLiner}</div>
                 <div className="mt-2 text-left">
-                  <VerdictBanner verdict={getVerdict(setup, price)} />
+                  <VerdictBanner verdict={getVerdict(setup, price, regime)} />
                 </div>
                 <div className="grid grid-cols-3 gap-1 mt-2 text-xs">
                   <div><div className="text-muted-foreground">Masuk</div><div className="font-mono text-foreground">{formatPrice(planEntryRef(setup))}</div></div>

@@ -24,25 +24,25 @@ export function BacktestResultsPanel() {
 
       <div className="rounded-lg border border-border bg-card p-3 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-foreground">Mesin sinyal bot & scanner</p>
-          <Badge tone="red"><XCircle className="h-3.5 w-3.5" />Rugi dalam 2 tahun</Badge>
+          <p className="text-sm font-semibold text-foreground">Strategi bot (long saja)</p>
+          <Badge tone="yellow"><AlertTriangle className="h-3.5 w-3.5" />Untung hanya saat pasar naik</Badge>
         </div>
-        <p className="text-muted-foreground">Target 3% · batas rugi 20% · tutup paksa 72 jam. Diuji 2 tahun (Agu 2024–Sep 2026), 42 koin dengan histori penuh.</p>
-        <p className="text-muted-foreground">Sinyal LONG (yang dijalankan bot):</p>
+        <p className="text-muted-foreground">Keduanya: batas rugi 20% · leverage 5x · margin 4%/posisi · total margin maks 15% · rem BTC 10%.</p>
+        <p className="text-muted-foreground"><span className="text-foreground font-medium">Stabil (Akun A)</span> — target 3%, tutup paksa 72 jam:</p>
         <div className="grid grid-cols-3 gap-1">
-          <Stat label="Trade" value="225" />
-          <Stat label="Win rate" value="72%" />
-          <Stat label="Hasil / trade" value="−0,98%" tone="text-red-400" />
+          <Stat label="6 bln · 68 koin" value="+0,51%" tone="text-green-400" />
+          <Stat label="Win rate 6 bln" value="85%" />
+          <Stat label="1 thn · 21 koin" value="−0,10%" tone="text-red-400" />
         </div>
-        <p className="text-muted-foreground">Per kuartal, hasil long mengikuti arah BTC:</p>
+        <p className="text-muted-foreground"><span className="text-foreground font-medium">Trailing (Akun B)</span> — aktif setelah +3%, jarak 3%, tahan maks 2 minggu:</p>
         <div className="grid grid-cols-3 gap-1">
-          <Stat label="BTC naik (2025 Q2–Q3, 2026 Q3)" value="+1,2 s/d +1,6%" tone="text-green-400" />
-          <Stat label="BTC turun (2025 Q1, Q4, 2026 Q1)" value="−1,0 s/d −2,1%" tone="text-red-400" />
-          <Stat label="Short (semua periode)" value="−0,80%" tone="text-red-400" />
+          <Stat label="6 bln · 68 koin" value="+1,34%" tone="text-green-400" />
+          <Stat label="Win rate 6 bln" value="85%" />
+          <Stat label="1 thn · 21 koin" value="−0,35%" tone="text-red-400" />
         </div>
         <p className="text-muted-foreground">
-          Hasil bagus di data Mei–Sep 2026 ternyata karena pasar sedang naik, bukan keunggulan sinyal. Dalam 2 tahun, long maupun short sama-sama rugi.
-          Jangan pakai uang sungguhan dengan aturan ini.
+          Hasil per trade = gerak harga setelah biaya. Dalam 2 tahun (42 koin) long rugi −0,98%/trade: untung saat BTC naik, rugi −1% s/d −5% saat BTC turun.
+          Trailing lebih untung saat bull tapi lebih rugi saat pasar berbalik. Sedang diuji berdampingan di paper mode.
         </p>
       </div>
 
@@ -73,6 +73,12 @@ export function BacktestResultsPanel() {
         <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Momentum/reversal antar-koin — untungnya datang dari satu koin yang naik +857%; minggu lain bisa −36%.</p>
         <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Breakout tren Donchian 4 jam — periode uji −0,26R/trade.</p>
         <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Batas rugi sempit (1%) — tampak untung di backtest lama, ternyata akibat bug simulasi yang sudah diperbaiki.</p>
+        <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Tanpa batas waktu / tahan 1 minggu (target 3%) — win rate naik ke 82%, tapi kena batas rugi 3x lebih sering: 1 thn −1,36%/trade.</p>
+        <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Target 5% / 8% — 6 bln bagus (target 8%: +1,63%), tapi saat pasar turun −8%/trade; win rate turun ke 54–62%.</p>
+        <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Target 8% + trailing — lebih buruk dari trailing saja.</p>
+        <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Filter tren BTC (rata-rata 50 hari) untuk long — 2 thn malah −2,77%/trade.</p>
+        <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Short cepat hanya saat BTC turun (target 1–2%) — untung di 2025, rugi di 2026; win rate 57–66%.</p>
+        <p className="flex items-start gap-1.5 text-muted-foreground"><XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" /> Ranking koin — koin terbaik 3 bulan pertama tidak lebih baik di 3 bulan berikutnya (tiap koin cuma 1–3 trade).</p>
       </div>
 
       <p className="flex items-start gap-1.5 text-muted-foreground">
