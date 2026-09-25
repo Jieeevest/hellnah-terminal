@@ -15,8 +15,8 @@ export interface FuturesTradePlan {
 // SL/TP persentase tetap dari harga masuk — bukan ATR/support-resistance lagi. Single
 // bracket TP1/SL (bukan staircase TP1/TP2/TP3 lagi) — TP1 kena -> qty ditutup PENUH
 // (TP1_PORTION=1.0), gak ada tahap lanjutan buat dikunci bertahap.
-// SL 20%/TP 3% dari grid backtest 25 Sep 2026 (win rate uji 84%, avg +0.25%/trade uji,
-// +0.14% latih; sinyal dibalik -0.98%). SL selebar ini aman cuma karena akun pakai CROSS margin dan total margin
+// SL 20%/TP 3% dari grid backtest 25 Sep 2026 — tapi backtest 2 tahun (42 koin) long
+// cuma untung saat BTC naik, total -0.98%/trade; belum layak uang riil). SL selebar ini aman cuma karena akun pakai CROSS margin dan total margin
 // bot dibatasi HARD_LIMITS.maxTotalMarginPct — di isolated 5x posisi keburu likuidasi.
 export const SL_PCT = 0.2
 export const TP1_PCT = 0.03

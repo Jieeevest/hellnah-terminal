@@ -25,23 +25,24 @@ export function BacktestResultsPanel() {
       <div className="rounded-lg border border-border bg-card p-3 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-semibold text-foreground">Mesin sinyal bot & scanner</p>
-          <Badge tone="yellow"><FlaskConical className="h-3.5 w-3.5" />Menjanjikan, belum terbukti</Badge>
+          <Badge tone="red"><XCircle className="h-3.5 w-3.5" />Rugi dalam 2 tahun</Badge>
         </div>
-        <p className="text-muted-foreground">50 koin · 250 hari · target 3% · batas rugi 20% · tutup paksa 72 jam</p>
+        <p className="text-muted-foreground">Target 3% · batas rugi 20% · tutup paksa 72 jam. Diuji 2 tahun (Agu 2024–Sep 2026), 42 koin dengan histori penuh.</p>
+        <p className="text-muted-foreground">Sinyal LONG (yang dijalankan bot):</p>
         <div className="grid grid-cols-3 gap-1">
-          <Stat label="Trade (uji)" value="68" />
-          <Stat label="Win rate" value="84%" />
-          <Stat label="Hasil / trade" value="+0,25%" tone="text-green-400" />
+          <Stat label="Trade" value="225" />
+          <Stat label="Win rate" value="72%" />
+          <Stat label="Hasil / trade" value="−0,98%" tone="text-red-400" />
         </div>
-        <p className="text-muted-foreground">Arah sinyal dibanding kebalikannya (hasil rata-rata per trade):</p>
+        <p className="text-muted-foreground">Per kuartal, hasil long mengikuti arah BTC:</p>
         <div className="grid grid-cols-3 gap-1">
-          <Stat label="Sesuai sinyal (latih)" value="+0,14%" tone="text-green-400" />
-          <Stat label="Dibalik (uji)" value="−0,98%" tone="text-red-400" />
-          <Stat label="Rugi terburuk" value="−20%" tone="text-red-400" />
+          <Stat label="BTC naik (2025 Q2–Q3, 2026 Q3)" value="+1,2 s/d +1,6%" tone="text-green-400" />
+          <Stat label="BTC turun (2025 Q1, Q4, 2026 Q1)" value="−1,0 s/d −2,1%" tone="text-red-400" />
+          <Stat label="Short (semua periode)" value="−0,80%" tone="text-red-400" />
         </div>
         <p className="text-muted-foreground">
-          Aturan lama (target 1,5% / batas rugi 4%) rugi −0,09R dan tidak lebih baik dari acak. Dengan aturan baru, sinyal jelas lebih baik dari arah kebalikannya,
-          tapi untungnya tipis dan satu kali kena batas rugi menghapus ±7 kali untung. Sampel masih kecil — tunggu hasil paper trading sebelum pakai uang sungguhan.
+          Hasil bagus di data Mei–Sep 2026 ternyata karena pasar sedang naik, bukan keunggulan sinyal. Dalam 2 tahun, long maupun short sama-sama rugi.
+          Jangan pakai uang sungguhan dengan aturan ini.
         </p>
       </div>
 

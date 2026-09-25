@@ -42,13 +42,13 @@ const TRAIN_FRACTION = 0.7
 
 const ENTRY_TTL_BARS = 2          // batal kalau harga tidak masuk zona entry dalam 2 candle 1h
 const TIME_STOP_BARS = 8          // cut loose kalau belum sempat nyentuh TP1 sama sekali, TAPI cuma kalau lagi untung
-const MAX_HOLD_BARS = 24          // EKSPERIMEN: backstop mutlak -- tutup posisi apapun kondisinya kalau udah selama ini, gak ada di production
+const MAX_HOLD_BARS = 72          // backstop mutlak -- tutup posisi apapun kondisinya, sama dengan MAX_HOLD_BARS di positionManager.ts
 const HARD_CAP_BARS = 200         // batas aman simulasi, bukan bagian dari strategi
 const SYMBOL_COOLDOWN_BARS = 4
 // EKSPERIMEN (belum ada di production) — begitu harga sempat bergerak sejauh
 // LOCK_TRIGGER_PCT searah posisi, SL digeser ke fillPrice +/- LOCK_PROFIT_PCT (BUKAN ke
 // breakeven persis, tapi ke level yang udah pasti untung). 0 = mati.
-const LOCK_TRIGGER_PCT = 0.015
+const LOCK_TRIGGER_PCT = 0
 const LOCK_PROFIT_PCT = 0.01
 // EKSPERIMEN (belum ada di production) — SL KHUSUS short pakai persentase ini (bukan
 // SL_PCT global 4%), long TETAP pakai SL_PCT normal. Entry gate TETAP dievaluasi pakai
