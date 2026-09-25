@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import axios from 'axios'
 import type { Ticker, Exchange } from '@/types'
 import type { Candle } from '@/lib/indicators'
 import { generateMTFSignal, type Timeframe } from '@/lib/signals'
 import { analyzeFuturesSetup, type FuturesTradePlan } from '@/lib/futuresEngine'
+import { fetchMultiTimeframeCandles } from '@/lib/candleFetch'
 import { useFearGreed } from './useFearGreed'
-import { API_URLS } from '@/constants/apiUrls'
+import { calcFibRetracement, nearestFibLevel, type FibLevel } from '@/lib/fibonacci'
 
 export type { FuturesTradePlan } from '@/lib/futuresEngine'
 
@@ -14,6 +14,7 @@ export interface FuturesOpportunity {
   side: 'long' | 'short'
   score: number
   accuracyPct: number
+  alignment: number
   confidenceLabel: 'High' | 'Medium' | 'Low'
   riskLabel: 'Low' | 'Medium' | 'High'
   crowdednessLabel: 'Low' | 'Moderate' | 'High'
@@ -24,86 +25,21 @@ export interface FuturesOpportunity {
   invalidationReason: string
   primaryPlan: FuturesTradePlan
   tradePlans: Partial<Record<Timeframe, FuturesTradePlan>>
+  // Level fib (grafik 1 jam, 3 hari) yang dekat titik masuk rencana — konfirmasi tambahan.
+  fibLevel: FibLevel | null
   scannedAt: number
 }
 
 export type OpportunityScanStatus = 'idle' | 'scanning' | 'done' | 'error'
 
-const TIMEFRAMES: Timeframe[] = ['15m', '30m', '1h', '4h']
-const MAX_TICKERS = 60
+export const TIMEFRAMES: Timeframe[] = ['15m', '30m', '1h', '4h']
+export const MAX_TICKERS = 60
 const BATCH_SIZE = 3
 const BATCH_DELAY_MS = 450
 
-async function fetchCandleTf(
-  symbol: string,
-  exchange: Exchange,
-  tf: Timeframe
-): Promise<Candle[]> {
-  try {
-    switch (exchange) {
-      case 'binance': {
-        const { data } = await axios.get(`${API_URLS.binance.futures}/klines`, {
-          params: { symbol, interval: tf, limit: 150 },
-          timeout: 8000,
-        })
-        return (data as any[]).map((d) => ({
-          time: d[0], open: parseFloat(d[1]), high: parseFloat(d[2]),
-          low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
-        }))
-      }
-      case 'kucoin': {
-        const granMap: Record<Timeframe, number> = { '15m': 15, '30m': 30, '1h': 60, '4h': 240 }
-        const to = Date.now()
-        const from = to - 60 * 1000 * granMap[tf] * 150
-        const { data } = await axios.get(`${API_URLS.kucoin.futures}/kline/query`, {
-          params: { symbol, granularity: granMap[tf], from, to },
-          timeout: 8000,
-        })
-        return ((data?.data ?? []) as any[]).map((d: any) => ({
-          time: d[0], open: parseFloat(d[1]), high: parseFloat(d[3]),
-          low: parseFloat(d[4]), close: parseFloat(d[2]), volume: parseFloat(d[5]),
-        }))
-      }
-      case 'okx': {
-        const barMap: Record<Timeframe, string> = { '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H' }
-        const { data } = await axios.get(`${API_URLS.okx.market}/candles`, {
-          params: { instId: symbol, bar: barMap[tf], limit: 150 },
-          timeout: 8000,
-        })
-        return ((data?.data ?? []) as any[]).reverse().map((d: any) => ({
-          time: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
-          low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
-        }))
-      }
-      case 'cryptocom': {
-        const { data } = await axios.get(
-          `${API_URLS.cryptoCom.public}/get-candlestick`,
-          { params: { instrument_name: symbol, timeframe: tf, count: 150 }, timeout: 8000 }
-        )
-        return ((data?.result?.data ?? []) as any[]).reverse().map((d: any) => ({
-          time: d.t, open: parseFloat(d.o), high: parseFloat(d.h),
-          low: parseFloat(d.l), close: parseFloat(d.c), volume: parseFloat(d.v),
-        }))
-      }
-    }
-  } catch {
-    return []
-  }
-}
-
-async function fetchMultiTimeframeCandles(symbol: string, exchange: Exchange): Promise<Record<string, Candle[]>> {
-  const map: Record<string, Candle[]> = {}
-  await Promise.all(
-    TIMEFRAMES.map(async (tf) => {
-      map[tf] = await fetchCandleTf(symbol, exchange, tf)
-    })
-  )
-  return map
-}
-
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-function buildOpportunity(
+export function buildOpportunity(
   ticker: Ticker,
   candlesMap: Record<string, Candle[]>,
   fgValue: number | null,
@@ -114,13 +50,17 @@ function buildOpportunity(
   if (!signal) return null
 
   const analysis = analyzeFuturesSetup(ticker, signal, candlesMap, maxVolume, maxOpenInterest)
-  if (!analysis.primaryPlan || analysis.rankingScore < 58) return null
+  if (!analysis || !analysis.primaryPlan || analysis.rankingScore < 58) return null
+
+  const fib = calcFibRetracement(candlesMap['1h'] ?? [])
+  const entryRef = analysis.side === 'long' ? analysis.primaryPlan.openLow : analysis.primaryPlan.openHigh
 
   return {
     ticker,
     side: analysis.side,
     score: analysis.rankingScore,
     accuracyPct: analysis.accuracyPct,
+    alignment: analysis.alignment,
     confidenceLabel: analysis.confidenceLabel,
     riskLabel: analysis.riskLabel,
     crowdednessLabel: analysis.crowdednessLabel,
@@ -131,6 +71,7 @@ function buildOpportunity(
     invalidationReason: analysis.invalidationReason,
     primaryPlan: analysis.primaryPlan,
     tradePlans: analysis.tradePlans,
+    fibLevel: fib ? nearestFibLevel(fib, entryRef) : null,
     scannedAt: Date.now(),
   }
 }
@@ -195,7 +136,7 @@ export function useFuturesOpportunities(tickers: Ticker[], exchange: Exchange) {
 
         const batchResults = await Promise.all(
           batch.map(async (ticker) => {
-            const candlesMap = await fetchMultiTimeframeCandles(ticker.symbol, exchange)
+            const candlesMap = await fetchMultiTimeframeCandles(ticker.symbol, exchange, TIMEFRAMES, { dropUnclosed: true })
             if (!candlesMap['1h'] || candlesMap['1h'].length < 60) return null
             return buildOpportunity(ticker, candlesMap, fgData?.value ?? null, maxVolume, maxOpenInterest)
           })
@@ -242,4 +183,47 @@ export function useFuturesOpportunities(tickers: Ticker[], exchange: Exchange) {
   }, [])
 
   return { opportunities, status, progress, scannedCount, totalCount, lastRunAt, runScan, cancelScan }
+}
+
+export type CoinSetupStatus = 'loading' | 'ready' | 'unavailable'
+
+// Analisa satu koin pakai mesin yang sama persis dengan scanner & bot (generateMTFSignal +
+// analyzeFuturesSetup), supaya ringkasan koin gak pernah beda kesimpulan dengan scanner.
+export function useFuturesSetup(symbol: string | null, futuresTickers: Ticker[]) {
+  const { data: fgData } = useFearGreed()
+  const [setup, setSetup] = useState<FuturesOpportunity | null>(null)
+  const [status, setStatus] = useState<CoinSetupStatus>('loading')
+  const tickersRef = useRef(futuresTickers)
+  const fgRef = useRef(fgData)
+  useEffect(() => { tickersRef.current = futuresTickers }, [futuresTickers])
+  useEffect(() => { fgRef.current = fgData }, [fgData])
+  const hasTickers = futuresTickers.length > 0
+
+  useEffect(() => {
+    if (!symbol || !hasTickers) return
+    let cancelled = false
+    setSetup(null)
+    setStatus('loading')
+
+    const run = async () => {
+      const all = tickersRef.current
+      const ticker = all.find((t) => t.symbol === symbol)
+      if (!ticker) { if (!cancelled) setStatus('unavailable'); return }
+      // Normalisasi volume/OI dihitung dari pool yang sama dengan scanner (top 60 by volume).
+      const pool = [...all].sort((a, b) => b.volume - a.volume).slice(0, MAX_TICKERS)
+      const maxVolume = Math.max(...pool.map((t) => t.volume), 0)
+      const maxOpenInterest = Math.max(...pool.map((t) => t.openInterest ?? 0), 0)
+      const candlesMap = await fetchMultiTimeframeCandles(symbol, 'binance', TIMEFRAMES, { dropUnclosed: true })
+      if (cancelled) return
+      if (!candlesMap['1h'] || candlesMap['1h'].length < 60) { setStatus('unavailable'); return }
+      setSetup(buildOpportunity(ticker, candlesMap, fgRef.current?.value ?? null, maxVolume, maxOpenInterest))
+      setStatus('ready')
+    }
+
+    run()
+    const id = setInterval(run, 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [symbol, hasTickers])
+
+  return { setup, status }
 }

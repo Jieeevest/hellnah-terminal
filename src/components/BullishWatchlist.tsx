@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Scan, X, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Filter, Info } from 'lucide-react'
+import { Scan, X, TrendingUp, TrendingDown, Minus, RefreshCw, Filter, Info } from 'lucide-react'
 import type { Ticker, Exchange, MarketType } from '@/types'
 import { useBullishScanner, type ScanResult, type FuturesTradePlan } from '@/hooks/useBullishScanner'
 import type { BullishLabel, Timeframe } from '@/lib/signals'
 import { cn, formatNumber, formatPrice } from '@/lib/utils'
 import { InfoTooltip } from '@/components/InfoTooltip'
+import { CoinIcon } from '@/components/CoinIcon'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { PillTabs } from '@/components/ui/PillTabs'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface Props {
   tickers: Ticker[]
@@ -16,11 +19,11 @@ interface Props {
 
 // ── Label styling ───────────────────────────────────────────────────────────
 const LABEL_CFG: Record<BullishLabel, { color: string; bg: string; icon: React.ReactNode }> = {
-  'Bullish':      { color: 'text-green-400',  bg: 'bg-green-500/15',   icon: <TrendingUp className="h-3 w-3" /> },
-  'Mild Bullish': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: <TrendingUp className="h-3 w-3" /> },
-  'Neutral':      { color: 'text-yellow-400', bg: 'bg-yellow-500/10',  icon: <Minus className="h-3 w-3" /> },
-  'Mild Bearish': { color: 'text-orange-400', bg: 'bg-orange-500/10',  icon: <TrendingDown className="h-3 w-3" /> },
-  'Bearish':      { color: 'text-red-400',    bg: 'bg-red-500/15',     icon: <TrendingDown className="h-3 w-3" /> },
+  'Bullish':      { color: 'text-green-400',  bg: 'bg-green-500/15',   icon: <TrendingUp className="h-4 w-4" /> },
+  'Mild Bullish': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: <TrendingUp className="h-4 w-4" /> },
+  'Neutral':      { color: 'text-yellow-400', bg: 'bg-yellow-500/10',  icon: <Minus className="h-4 w-4" /> },
+  'Mild Bearish': { color: 'text-orange-400', bg: 'bg-orange-500/10',  icon: <TrendingDown className="h-4 w-4" /> },
+  'Bearish':      { color: 'text-red-400',    bg: 'bg-red-500/15',     icon: <TrendingDown className="h-4 w-4" /> },
 }
 
 const THRESHOLD_OPTIONS = [
@@ -241,12 +244,12 @@ function FuturesPlanCard({ timeframe, plan }: { timeframe: Timeframe; plan: Futu
   return (
     <div className="rounded-md border border-border/60 bg-background/40 px-2 py-2">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[10px] font-semibold text-foreground">{timeframeLabel(timeframe)}</span>
-        <span className={cn('text-[9px] px-1.5 py-0.5 rounded font-medium', tone.className)}>
+        <span className="text-xs font-semibold text-foreground">{timeframeLabel(timeframe)}</span>
+        <span className={cn('text-xs px-1.5 py-0.5 rounded font-medium', tone.className)}>
           {tone.label}
         </span>
       </div>
-      <div className="space-y-1 text-[9px] leading-relaxed text-muted-foreground">
+      <div className="space-y-1 text-xs leading-relaxed text-muted-foreground">
         <p>
           <span className="text-foreground font-medium">Open:</span> {formatPrice(plan.openLow)} - {formatPrice(plan.openHigh)}
         </p>
@@ -254,7 +257,7 @@ function FuturesPlanCard({ timeframe, plan }: { timeframe: Timeframe; plan: Futu
           <span className="text-foreground font-medium">Close rugi:</span> di bawah {formatPrice(plan.stopLoss)}
         </p>
         <p>
-          <span className="text-foreground font-medium">Close untung:</span> {formatPrice(plan.takeProfit1)} lalu {formatPrice(plan.takeProfit2)}
+          <span className="text-foreground font-medium">Close untung:</span> {formatPrice(plan.takeProfit1)}
         </p>
         <p>
           <span className="text-foreground font-medium">RR:</span> {plan.riskReward.toFixed(2)}x
@@ -275,12 +278,7 @@ function PctBar({ pct }: { pct: number }) {
     'bg-red-500'
   return (
     <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
-      <motion.div
-        className={cn('h-full rounded-full', color)}
-        initial={{ width: 0 }}
-        animate={{ width: `${pct}%` }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-      />
+      <div className={cn('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${pct}%` }} />
     </div>
   )
 }
@@ -307,31 +305,27 @@ function ResultRow({ result, rank, onClick, marketType }: {
   const quickTake = buildFuturesQuickTake(result)
 
   return (
-    <motion.button
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.2 }}
+    <button
       onClick={onClick}
       className="w-full flex flex-col gap-1 px-3 py-2.5 border-b border-border/50 hover:bg-muted/30 text-left transition-colors"
     >
       {/* Row 1: rank + symbol + label + pct */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-muted-foreground w-4 shrink-0 font-mono">{rank}</span>
-        <span className="font-bold text-xs text-foreground flex-1 truncate flex items-center gap-1">
+        <span className="text-xs text-muted-foreground w-4 shrink-0 font-mono">{rank}</span>
+        <CoinIcon asset={ticker.baseAsset} size={22} />
+        <span className="font-bold text-sm text-foreground flex-1 truncate flex items-center gap-1">
           {ticker.baseAsset}
           <span className="text-muted-foreground font-normal">{isFutures ? '/PERP' : '/USDT'}</span>
-          {signal.trend === 'Uptrend' && <TrendingUp className="h-3 w-3 text-green-400 ml-0.5" />}
-          {signal.trend === 'Downtrend' && <TrendingDown className="h-3 w-3 text-red-400 ml-0.5" />}
+          {signal.trend === 'Uptrend' && <TrendingUp className="h-4 w-4 text-green-400 ml-0.5" />}
+          {signal.trend === 'Downtrend' && <TrendingDown className="h-4 w-4 text-red-400 ml-0.5" />}
         </span>
         <InfoTooltip {...scoreTooltip(rankingScore)}>
-          <div className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold cursor-default">
+          <div className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold cursor-default">
             {rankingScore.toFixed(1)}
           </div>
         </InfoTooltip>
         <InfoTooltip {...labelTooltip(signal.label, signal.bullishPct)}>
-          <div className={cn('flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-semibold cursor-default', cfg.bg, cfg.color)}>
+          <div className={cn('flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded font-semibold cursor-default', cfg.bg, cfg.color)}>
             {cfg.icon}
             {signal.label}
           </div>
@@ -344,12 +338,12 @@ function ResultRow({ result, rank, onClick, marketType }: {
           <PctBar pct={signal.bullishPct} />
         </InfoTooltip>
         <InfoTooltip {...bullishPctTooltip(signal.bullishPct)} side="bottom">
-          <span className="text-[11px] font-mono font-bold text-foreground w-10 text-right cursor-default">
+          <span className="text-xs font-mono font-bold text-foreground w-10 text-right cursor-default">
             {signal.bullishPct.toFixed(1)}%
           </span>
         </InfoTooltip>
         <InfoTooltip {...priceChangeTip(ticker.priceChangePercent)} side="bottom">
-          <span className={cn('text-[10px] font-mono w-14 text-right cursor-default', pctColor)}>
+          <span className={cn('text-xs font-mono w-14 text-right cursor-default', pctColor)}>
             {ticker.priceChangePercent >= 0 ? '+' : ''}{ticker.priceChangePercent.toFixed(2)}%
           </span>
         </InfoTooltip>
@@ -358,14 +352,14 @@ function ResultRow({ result, rank, onClick, marketType }: {
       {/* Row 3: futures context */}
       {isFutures && (
         <div className="flex gap-1 pl-6 flex-wrap">
-          <span className={cn('text-[9px] px-1.5 py-0.5 rounded', fundingTone)}>
+          <span className={cn('text-xs px-1.5 py-0.5 rounded', fundingTone)}>
             Fund {ticker.fundingRate == null ? '—' : `${ticker.fundingRate >= 0 ? '+' : ''}${ticker.fundingRate.toFixed(4)}%`}
           </span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded text-sky-400 bg-sky-500/10">
+          <span className="text-xs px-1.5 py-0.5 rounded text-sky-400 bg-sky-500/10">
             Vol {formatNumber(ticker.volume)}
           </span>
           {ticker.openInterest ? (
-            <span className="text-[9px] px-1.5 py-0.5 rounded text-fuchsia-400 bg-fuchsia-500/10">
+            <span className="text-xs px-1.5 py-0.5 rounded text-fuchsia-400 bg-fuchsia-500/10">
               OI {formatNumber(ticker.openInterest)}
             </span>
           ) : null}
@@ -373,7 +367,7 @@ function ResultRow({ result, rank, onClick, marketType }: {
       )}
 
       {isFutures && (
-        <div className="pl-6 pr-1 text-[10px] leading-relaxed text-muted-foreground">
+        <div className="pl-6 pr-1 text-xs leading-relaxed text-muted-foreground">
           <span className="text-foreground font-medium">Bacaan cepat:</span> {result.summary ?? quickTake}
           <br />
           <span className="text-foreground font-medium">Ringkasan:</span> {result.oneLiner ?? result.driver ?? fundingCopy.detail}
@@ -385,22 +379,22 @@ function ResultRow({ result, rank, onClick, marketType }: {
       {isFutures && (
         <div className="flex gap-1 pl-6 flex-wrap">
           {result.contextLabel ? (
-            <span className={cn('text-[9px] px-1.5 py-0.5 rounded', infoTone('context', result.contextLabel))}>
+            <span className={cn('text-xs px-1.5 py-0.5 rounded', infoTone('context', result.contextLabel))}>
               {result.contextLabel}
             </span>
           ) : null}
           {result.confidenceLabel ? (
-            <span className={cn('text-[9px] px-1.5 py-0.5 rounded', infoTone('confidence', result.confidenceLabel))}>
+            <span className={cn('text-xs px-1.5 py-0.5 rounded', infoTone('confidence', result.confidenceLabel))}>
               Confidence {result.confidenceLabel}
             </span>
           ) : null}
           {result.riskLabel ? (
-            <span className={cn('text-[9px] px-1.5 py-0.5 rounded', infoTone('risk', result.riskLabel))}>
+            <span className={cn('text-xs px-1.5 py-0.5 rounded', infoTone('risk', result.riskLabel))}>
               Risk {result.riskLabel}
             </span>
           ) : null}
           {result.crowdednessLabel ? (
-            <span className={cn('text-[9px] px-1.5 py-0.5 rounded', infoTone('crowdedness', result.crowdednessLabel))}>
+            <span className={cn('text-xs px-1.5 py-0.5 rounded', infoTone('crowdedness', result.crowdednessLabel))}>
               Crowded {result.crowdednessLabel}
             </span>
           ) : null}
@@ -414,7 +408,7 @@ function ResultRow({ result, rank, onClick, marketType }: {
               event.stopPropagation()
               setShowTradePlans((prev) => !prev)
             }}
-            className="text-[10px] text-sky-300 hover:text-sky-200 transition-colors"
+            className="text-xs text-sky-300 hover:text-sky-200 transition-colors"
           >
             {showTradePlans ? 'Sembunyikan' : 'Lihat'} rekomendasi open/close per timeframe
           </button>
@@ -442,14 +436,14 @@ function ResultRow({ result, rank, onClick, marketType }: {
                     'text-yellow-400 bg-yellow-500/10'
           return (
             <InfoTooltip key={tf} {...tfTooltip(tf, score)} side="bottom">
-              <span className={cn('text-[9px] px-1.5 py-0.5 rounded cursor-default', c)}>
+              <span className={cn('text-xs px-1.5 py-0.5 rounded cursor-default', c)}>
                 {tf.toUpperCase()} {score.toFixed(0)}%
               </span>
             </InfoTooltip>
           )
         })}
       </div>
-    </motion.button>
+    </button>
   )
 }
 
@@ -476,65 +470,59 @@ export function BullishWatchlist({ tickers, exchange, marketType, onSelectCoin }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-border bg-card shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-green-400" />
-            <span className="text-xs font-bold text-foreground">
-              {isFutures ? 'Futures Scanner' : 'Bullish Scanner'}
-            </span>
-            {status === 'done' && (
-              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                {filtered.length} hasil
-              </span>
-            )}
+      <PanelHeader
+        icon={TrendingUp}
+        iconClassName="text-green-400"
+        title={isFutures ? 'Scanner Futures' : 'Scanner Bullish (Spot)'}
+        subtitle={
+          status === 'scanning'
+            ? `Memindai ${scannedCount}/${totalCount} koin…`
+            : status === 'done'
+              ? `${filtered.length} hasil${timeAgo ? ` · scan ${timeAgo}` : ''}`
+              : 'Mencari koin dengan sinyal naik di grafik 15m, 30m, 1h & 4h'
+        }
+        right={
+          status === 'scanning' ? (
+            <button onClick={cancelScan} className="flex items-center gap-1 min-h-7 px-2.5 rounded-full border border-border text-xs text-red-400 hover:bg-red-500/10">
+              <X className="h-3.5 w-3.5" /> Batal
+            </button>
+          ) : (
+            <button
+              onClick={runScan}
+              disabled={tickers.length === 0}
+              className="flex items-center gap-1 min-h-7 px-2.5 rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-40"
+            >
+              {status === 'idle' ? <Scan className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {status === 'idle' ? `Scan ${Math.min(tickers.length, 80)} koin` : 'Scan ulang'}
+            </button>
+          )
+        }
+      >
+        {status === 'scanning' && (
+          <div className="h-1 rounded-full bg-muted overflow-hidden">
+            <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
           </div>
-          {timeAgo && status !== 'scanning' && (
-            <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
-              <Clock className="h-2.5 w-2.5" /> {timeAgo}
-            </span>
-          )}
-        </div>
+        )}
 
-        {/* Threshold filter */}
-        <div className="flex items-center gap-1 mb-2">
-          <Filter className="h-3 w-3 text-muted-foreground shrink-0" />
-          <div className="flex gap-1">
-            {THRESHOLD_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setThreshold(opt.value)}
-                className={cn(
-                  'px-2 py-0.5 text-[9px] rounded border transition-colors',
-                  threshold === opt.value
-                    ? 'border-green-500/50 text-green-400 bg-green-500/10'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground'
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Kekuatan sinyal:</span>
+          <PillTabs value={threshold} onChange={setThreshold} options={THRESHOLD_OPTIONS.map((o) => ({ id: o.value, label: o.label }))} />
         </div>
 
         {isFutures && (
-          <div className="mb-2 rounded-md border border-sky-500/20 bg-sky-500/5 px-2.5 py-2">
+          <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2.5 py-2">
             <button
               onClick={() => setShowFuturesGuide((prev) => !prev)}
               className="w-full flex items-center justify-between gap-2 text-left"
             >
-              <span className="flex items-center gap-1.5 text-[10px] font-semibold text-sky-300">
-                <Info className="h-3 w-3" />
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-sky-300">
+                <Info className="h-4 w-4" />
                 Cara baca hasil futures
               </span>
-              <span className="text-[9px] text-muted-foreground">
-                {showFuturesGuide ? 'Sembunyikan' : 'Tampilkan'}
-              </span>
+              <span className="text-xs text-muted-foreground">{showFuturesGuide ? 'Sembunyikan' : 'Tampilkan'}</span>
             </button>
-
             {showFuturesGuide && (
-              <div className="mt-2 space-y-1.5 text-[10px] leading-relaxed text-muted-foreground">
+              <div className="mt-2 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
                 <p>
                   Scanner ini membantu mencari kontrak futures yang sedang terlihat menarik. Hasil tinggi bukan berarti wajib buy,
                   tetapi berarti setup-nya lebih layak dipantau.
@@ -552,97 +540,43 @@ export function BullishWatchlist({ tickers, exchange, marketType, onSelectCoin }
             )}
           </div>
         )}
+      </PanelHeader>
 
-        {/* Scan button / progress */}
-        {status === 'scanning' ? (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">
-                Scanning {scannedCount}/{totalCount} koin...
-              </span>
-              <button
-                onClick={cancelScan}
-                className="text-[9px] text-red-400 hover:text-red-300 flex items-center gap-0.5"
-              >
-                <X className="h-2.5 w-2.5" /> Batal
-              </button>
-            </div>
-            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-              <motion.div
-                className="h-full bg-green-500 rounded-full"
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-          </div>
-        ) : (
-          <motion.button
-            onClick={runScan}
-            disabled={tickers.length === 0}
-            whileTap={{ scale: 0.97 }}
-            className="w-full py-1.5 rounded-md bg-green-500/15 text-green-400 text-[11px] font-bold
-                       border border-green-500/30 flex items-center justify-center gap-1.5
-                       hover:bg-green-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {status === 'idle' ? (
-              <><Scan className="h-3 w-3" /> Mulai Scan ({Math.min(tickers.length, 80)} {isFutures ? 'kontrak' : 'koin'})</>
-            ) : (
-              <><RefreshCw className="h-3 w-3" /> Scan Ulang</>
-            )}
-          </motion.button>
-        )}
-      </div>
-
-      {/* Results list */}
       <div className="flex-1 overflow-y-auto">
         {status === 'idle' && results.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground px-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-green-400" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-foreground mb-1">
-                {isFutures ? 'Futures Setup Scanner' : 'Bullish Scanner MTF'}
-              </p>
-              <p className="text-[10px] leading-relaxed">
-                Klik "Mulai Scan" untuk menganalisis {isFutures ? 'kontrak futures' : 'semua koin'} berdasarkan<br />
-                Multi-Timeframe (15m, 30m, 1h, 4h)<br />
-                dengan kombinasi Classic & Weighted Signal{isFutures ? ' + funding context.' : '.'}
-              </p>
-            </div>
-          </div>
+          <EmptyState
+            icon={TrendingUp}
+            title="Belum dipindai"
+            description={<>Klik &quot;Scan&quot; untuk menganalisis {isFutures ? 'kontrak futures' : 'semua koin'} di grafik 15m, 30m, 1h & 4h.</>}
+          />
         )}
 
-        {filtered.length === 0 && status === 'done' && (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground px-4 text-center">
-            <Minus className="h-5 w-5" />
-            <p className="text-[10px]">Tidak ada koin yang memenuhi threshold {threshold}% saat ini.</p>
-            <button
-              onClick={() => setThreshold(0)}
-              className="text-[10px] text-primary hover:underline"
-            >
-              Tampilkan semua
-            </button>
-          </div>
+        {results.length === 0 && status === 'done' && (
+          <EmptyState icon={Minus} title="Tidak ada setup kuat saat ini" description="Pasar sedang tidak memberi sinyal yang cukup meyakinkan — lebih aman menunggu." />
         )}
 
-        <AnimatePresence mode="popLayout">
-          {filtered.map((result, i) => (
-            <ResultRow
-              key={result.ticker.symbol}
-              result={result}
-              rank={i + 1}
-              marketType={marketType}
-              onClick={() => onSelectCoin(result.ticker)}
-            />
-          ))}
-        </AnimatePresence>
+        {filtered.length === 0 && results.length > 0 && status === 'done' && (
+          <EmptyState
+            icon={Filter}
+            title={`Tidak ada koin dengan kekuatan sinyal ≥ ${threshold}%`}
+            action={<button onClick={() => setThreshold(0)} className="text-xs text-primary hover:underline">Tampilkan semua</button>}
+          />
+        )}
 
-        {/* Live streaming indicator while scanning */}
+        {filtered.map((result, i) => (
+          <ResultRow
+            key={result.ticker.symbol}
+            result={result}
+            rank={i + 1}
+            marketType={marketType}
+            onClick={() => onSelectCoin(result.ticker)}
+          />
+        ))}
+
         {status === 'scanning' && filtered.length > 0 && (
-          <div className="px-3 py-2 text-[9px] text-muted-foreground flex items-center gap-1 border-t border-border">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
-            Hasil diperbarui secara live...
+          <div className="px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5 border-t border-border">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+            Hasil diperbarui selama pemindaian…
           </div>
         )}
       </div>

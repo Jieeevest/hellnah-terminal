@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { calcLiqPrice } from '@/lib/liquidation'
 import type { Ticker, MarketType } from '@/types'
 
 interface Props {
@@ -16,13 +17,6 @@ type MarginMode = 'cross' | 'isolated'
 
 const PCT_BUTTONS = [25, 50, 75, 100]
 const LEVERAGE_PRESETS = [1, 2, 5, 10, 20, 50, 100, 125]
-
-function calcLiqPrice(entry: number, side: Side, leverage: number): number {
-  // simplified isolated margin liquidation price
-  const mmr = 0.004 // maintenance margin rate
-  if (side === 'buy') return entry * (1 - 1 / leverage + mmr)
-  return entry * (1 + 1 / leverage - mmr)
-}
 
 export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: Props) {
   const [side, setSide] = useState<Side>('buy')
@@ -86,7 +80,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
               {ticker.baseAsset}/{isFutures ? 'PERP' : 'USDT'}
             </span>
             {isFutures && (
-              <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1 py-0.5 rounded font-mono">
+              <span className="text-xs bg-yellow-500/20 text-yellow-400 px-1 py-0.5 rounded font-mono">
                 PERP
               </span>
             )}
@@ -100,11 +94,11 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
             {currentPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}
           </div>
           {isFutures && ticker.markPrice && (
-            <div className="text-[10px] text-muted-foreground">
+            <div className="text-xs text-muted-foreground">
               Mark: {ticker.markPrice.toFixed(4)}
             </div>
           )}
-          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>H: {ticker.high24h.toFixed(4)}</span>
             <span className={cn(ticker.priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400', 'font-medium')}>
               {ticker.priceChangePercent >= 0 ? '+' : ''}{ticker.priceChangePercent.toFixed(2)}%
@@ -112,7 +106,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
             <span>L: {ticker.low24h.toFixed(4)}</span>
           </div>
           {isFutures && ticker.fundingRate !== undefined && (
-            <div className="flex justify-center gap-1 mt-1 text-[10px]">
+            <div className="flex justify-center gap-1 mt-1 text-xs">
               <span className="text-muted-foreground">Funding:</span>
               <span className={ticker.fundingRate >= 0 ? 'text-green-400' : 'text-red-400'}>
                 {ticker.fundingRate >= 0 ? '+' : ''}{ticker.fundingRate.toFixed(4)}%
@@ -126,14 +120,14 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
       {isFutures && (
         <div className="flex flex-col gap-2 pb-2 border-b border-border">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-muted-foreground">Leverage</span>
+            <span className="text-xs text-muted-foreground">Leverage</span>
             <div className="flex gap-1">
               {(['cross', 'isolated'] as MarginMode[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => setMarginMode(m)}
                   className={cn(
-                    'px-2 py-0.5 text-[10px] rounded border transition-colors',
+                    'px-2 py-0.5 text-xs rounded border transition-colors',
                     marginMode === m
                       ? 'border-primary text-primary bg-primary/10'
                       : 'border-border text-muted-foreground hover:border-muted-foreground'
@@ -151,7 +145,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
                 key={lv}
                 onClick={() => setLeverage(lv)}
                 className={cn(
-                  'py-1 text-[10px] rounded border transition-colors font-mono',
+                  'py-1 text-xs rounded border transition-colors font-mono',
                   leverage === lv
                     ? 'border-yellow-500 text-yellow-400 bg-yellow-500/10'
                     : 'border-border text-muted-foreground hover:border-yellow-500/50'
@@ -164,7 +158,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
 
           {/* Custom leverage input */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground shrink-0">Custom:</span>
+            <span className="text-xs text-muted-foreground shrink-0">Custom:</span>
             <div className="flex items-center gap-1 flex-1">
               <input
                 type="range"
@@ -174,7 +168,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
                 onChange={(e) => setLeverage(parseInt(e.target.value))}
                 className="flex-1 h-1 accent-yellow-500 cursor-pointer"
               />
-              <span className="text-[10px] font-mono text-yellow-400 w-8 text-right">{leverage}x</span>
+              <span className="text-xs font-mono text-yellow-400 w-8 text-right">{leverage}x</span>
             </div>
           </div>
         </div>
@@ -220,7 +214,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
       </div>
 
       {/* Available balance */}
-      <div className="flex justify-between text-[10px] text-muted-foreground">
+      <div className="flex justify-between text-xs text-muted-foreground">
         <span>{isFutures ? 'Margin tersedia' : 'Tersedia'}</span>
         <span className="font-mono">
           {side === 'buy'
@@ -232,7 +226,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
       {/* Price input */}
       {orderType === 'limit' && (
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] text-muted-foreground">Harga (USDT)</label>
+          <label className="text-xs text-muted-foreground">Harga (USDT)</label>
           <input
             value={price}
             onChange={(e) => setPrice(e.target.value)}
@@ -245,7 +239,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
 
       {/* Amount input */}
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] text-muted-foreground">
+        <label className="text-xs text-muted-foreground">
           Jumlah ({ticker?.baseAsset ?? 'Koin'})
         </label>
         <input
@@ -264,7 +258,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
             key={p}
             onClick={() => handlePct(p)}
             className={cn(
-              'py-1 text-[10px] rounded border transition-colors',
+              'py-1 text-xs rounded border transition-colors',
               pct === p
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-border text-muted-foreground hover:border-muted-foreground'
@@ -278,16 +272,16 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
       {/* Total / Margin info */}
       {isFutures ? (
         <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-[10px]">
+          <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Nilai posisi</span>
             <span className="font-mono text-foreground">{total} USDT</span>
           </div>
-          <div className="flex justify-between text-[10px]">
+          <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Margin diperlukan</span>
             <span className="font-mono text-yellow-400">{marginRequired ?? '0.00'} USDT</span>
           </div>
           {liqPrice !== null && (
-            <div className="flex justify-between text-[10px]">
+            <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Est. Liq. Price</span>
               <span className={cn('font-mono', side === 'buy' ? 'text-red-400' : 'text-green-400')}>
                 {liqPrice.toFixed(4)}
@@ -297,7 +291,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] text-muted-foreground">Total (USDT)</label>
+          <label className="text-xs text-muted-foreground">Total (USDT)</label>
           <div className="bg-muted rounded px-3 py-2 text-sm font-mono text-muted-foreground">{total}</div>
         </div>
       )}
@@ -323,7 +317,7 @@ export function OrderPanel({ ticker, currentPrice, marketType, prefillPrice }: P
             : `Jual ${ticker?.baseAsset ?? ''}`}
       </motion.button>
 
-      <p className="text-[9px] text-muted-foreground text-center">
+      <p className="text-xs text-muted-foreground text-center">
         Mode simulasi — tidak ada transaksi nyata
       </p>
     </div>

@@ -3,7 +3,8 @@ import { Search, TrendingUp, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDow
 import type { Ticker, Exchange, MarketType } from '@/types'
 import { formatNumber, formatPrice, cn } from '@/lib/utils'
 import { useTimeframePercent } from '@/hooks/useTimeframePercent'
-import { useLunarCrush } from '@/hooks/useLunarCrush'
+import { CoinIcon } from '@/components/CoinIcon'
+import { Pill } from '@/components/ui/PillTabs'
 
 type SortKey = 'default' | 'volume' | 'change'
 type SortDir = 'asc' | 'desc'
@@ -22,19 +23,19 @@ interface Props {
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-40" />
-  return dir === 'desc' ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />
+  if (!active) return <ChevronsUpDown className="h-4 w-4 opacity-40" />
+  return dir === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
 }
 
 function PctCell({ pct, loading }: { pct: number | null | undefined; loading: boolean }) {
   if (loading && pct == null) {
-    return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />
+    return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-auto" />
   }
   if (pct == null) return <span className="text-muted-foreground text-xs">—</span>
   const pos = pct >= 0
   return (
     <div className={cn('text-xs font-medium flex items-center justify-end gap-0.5', pos ? 'text-green-400' : 'text-red-400')}>
-      {pos ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {pos ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
       {Math.abs(pct).toFixed(2)}%
     </div>
   )
@@ -66,8 +67,6 @@ export function CoinList({ tickers, loading, selectedSymbol, exchange, marketTyp
 
   const isFutures = marketType === 'futures'
 
-  const { coins: lcCoins } = useLunarCrush()
-  const lcMap = useMemo(() => new Map(lcCoins.map((c) => [c.symbol, c])), [lcCoins])
 
   const symbols = useMemo(() => tickers.map((t) => t.symbol), [tickers])
 
@@ -124,55 +123,36 @@ export function CoinList({ tickers, loading, selectedSymbol, exchange, marketTyp
       {/* Search */}
       <div className="p-3 border-b border-border">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-5 w-5 text-muted-foreground" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari koin..."
-            className="w-full bg-muted rounded-md pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full min-h-9 bg-muted rounded-lg pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       </div>
 
-      {/* Filter Mode & Timeframe tabs */}
-      <div className="flex flex-col border-b border-border">
-        <div className="flex bg-muted/30">
+      {/* Filter Mode & Timeframe */}
+      <div className="flex flex-col gap-1.5 px-3 py-2 border-b border-border">
+        <div className="flex gap-1">
           {(['all', 'top10', 'top25', 'watchlist'] as FilterMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setFilterMode(mode)}
-              className={cn(
-                'flex-1 py-1 text-[9px] font-medium transition-colors uppercase flex justify-center items-center gap-1',
-                filterMode === mode
-                  ? 'text-primary bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {mode === 'watchlist' && <Star className="h-2.5 w-2.5" />}
-              {mode === 'all' ? 'All' : mode === 'top10' ? 'Top 10' : mode === 'top25' ? 'Top 25' : 'Fav'}
-            </button>
+            <Pill key={mode} active={filterMode === mode} onClick={() => setFilterMode(mode)} className="flex-1 px-1">
+              {mode === 'all' ? 'Semua' : mode === 'top10' ? 'Top 10' : mode === 'top25' ? 'Top 25' : '★ Favorit'}
+            </Pill>
           ))}
         </div>
-        <div className="flex">
+        <div className="flex gap-1">
           {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={cn(
-                'flex-1 py-1.5 text-[10px] font-medium transition-colors',
-                timeframe === tf
-                  ? 'text-primary border-b-2 border-primary bg-primary/5'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
+            <Pill key={tf} active={timeframe === tf} onClick={() => setTimeframe(tf)} className="flex-1 px-1">
               {tf}
-            </button>
+            </Pill>
           ))}
         </div>
       </div>
 
       {/* Column header */}
-      <div className="flex items-center text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border font-medium select-none">
+      <div className="flex items-center text-xs text-muted-foreground px-3 py-1.5 border-b border-border font-medium select-none">
         <span className="flex-1">Pasangan</span>
         <button
           onClick={() => handleSort('volume')}
@@ -193,7 +173,7 @@ export function CoinList({ tickers, loading, selectedSymbol, exchange, marketTyp
         >
           {timeframe}
           {tfLoading && timeframe !== '24h' && (
-            <Loader2 className="h-2.5 w-2.5 animate-spin ml-0.5" />
+            <Loader2 className="h-4 w-4 animate-spin ml-0.5" />
           )}
           <SortIcon active={sortKey === 'change'} dir={sortDir} />
         </button>
@@ -217,7 +197,7 @@ export function CoinList({ tickers, loading, selectedSymbol, exchange, marketTyp
                 key={ticker.symbol}
                 onClick={() => onSelect(ticker)}
                 className={cn(
-                  'w-full flex items-center px-3 py-2 hover:bg-muted/50 transition-colors text-left group',
+                  'w-full flex items-center px-3 py-1.5 hover:bg-muted/50 transition-colors text-left group',
                   isSelected && 'bg-muted border-l-2 border-primary'
                 )}
               >
@@ -225,39 +205,27 @@ export function CoinList({ tickers, loading, selectedSymbol, exchange, marketTyp
                   onClick={(e) => toggleWatchlist(e, ticker.symbol)}
                   className="mr-2 text-muted-foreground hover:text-yellow-400 transition-colors shrink-0"
                 >
-                  <Star className={cn("h-3.5 w-3.5", watchlist.includes(ticker.symbol) && "fill-yellow-400 text-yellow-400")} />
+                  <Star className={cn("h-4 w-4", watchlist.includes(ticker.symbol) && "fill-yellow-400 text-yellow-400")} />
                 </div>
+                <CoinIcon
+                  asset={ticker.baseAsset}
+                  size={24}
+                  className={cn('mr-2.5 group-hover:scale-110', isSelected && 'ring-2 ring-primary')}
+                />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-semibold text-foreground">{ticker.baseAsset}</span>
-                    <span className="text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-sm font-bold text-foreground truncate">{ticker.baseAsset}</span>
+                    <span className="text-xs text-muted-foreground hidden 2xl:inline">
                       {isFutures ? '/PERP' : '/USDT'}
                     </span>
-                    {(() => {
-                      const lc = lcMap.get(ticker.baseAsset)
-                      if (!lc) return null
-                      return (
-                        <span className={cn(
-                          'text-[8px] font-bold font-mono px-1 rounded',
-                          lc.galaxyScore >= 75 ? 'bg-green-500/20 text-green-400' :
-                          lc.galaxyScore >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
-                          'bg-red-500/15 text-red-400'
-                        )}>
-                          {lc.galaxyScore}
-                        </span>
-                      )
-                    })()}
                   </div>
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-xs text-muted-foreground whitespace-nowrap truncate">
                     Vol {formatNumber(ticker.volume)}
                   </div>
                 </div>
 
-                <div className="w-20 text-right">
-                  <div className="text-xs font-mono text-foreground">{formatPrice(ticker.price)}</div>
-                </div>
-
-                <div className="w-16 text-right">
+                <div className="text-right shrink-0 ml-2">
+                  <div className="text-sm font-mono font-semibold text-foreground">{formatPrice(ticker.price)}</div>
                   <PctCell pct={displayPct} loading={tfLoading} />
                 </div>
               </button>

@@ -26,9 +26,9 @@ export function BTCWarningBanner({ tickers }: Props) {
       }`}
     >
       {isDanger ? (
-        <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+        <ShieldAlert className="w-5 h-5 shrink-0" />
       ) : (
-        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+        <AlertTriangle className="w-5 h-5 shrink-0" />
       )}
       <span className={`font-semibold ${isDanger ? 'text-red-200' : 'text-yellow-200'}`}>
         {status.label}:

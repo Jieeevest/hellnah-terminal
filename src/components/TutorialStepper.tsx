@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronRight, ChevronLeft, BarChart2, Scan,
-  LayoutGrid, TrendingUp, User, BookOpen, Zap, Coins,
+  TrendingUp, BookOpen, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,7 +19,7 @@ interface Step {
 const STEPS: Step[] = [
   {
     id: 'welcome',
-    title: 'Selamat Datang di Hellnah Terminal Terminal!',
+    title: 'Selamat Datang di Hellnah Terminal!',
     description:
       'Kami siapkan tur singkat untuk mengenalkan semua fitur terminal trading ini. Ikuti langkah-langkahnya atau skip kapan saja.',
     target: null,
@@ -27,19 +27,10 @@ const STEPS: Step[] = [
     icon: <Zap className="h-5 w-5 text-yellow-400" />,
   },
   {
-    id: 'exchange',
-    title: 'Pilih Exchange',
-    description:
-      'Switch antara 4 bursa kripto terbesar: Binance, Crypto.com, KuCoin, dan OKX — semua dengan data real-time langsung dari websocket exchange-nya.',
-    target: '[data-tutorial="exchange-tabs"]',
-    position: 'bottom',
-    icon: <Coins className="h-5 w-5 text-blue-400" />,
-  },
-  {
     id: 'market-type',
     title: 'Spot vs Futures',
     description:
-      'Toggle antara pasar Spot (beli/jual aset langsung) dan Futures Perpetual (kontrak dengan leverage). Keduanya tersedia di semua 4 exchange beserta data funding rate real-time.',
+      'Toggle antara pasar Spot (beli/jual aset langsung) dan Futures Perpetual (kontrak dengan leverage). Mode Futures juga menampilkan data funding rate real-time.',
     target: '[data-tutorial="market-type"]',
     position: 'bottom',
     icon: <TrendingUp className="h-5 w-5 text-emerald-400" />,
@@ -57,7 +48,7 @@ const STEPS: Step[] = [
     id: 'trading-chart',
     title: 'Chart TradingView',
     description:
-      'Chart interaktif powered by TradingView. Gunakan 100+ indikator teknikal bawaan: RSI, MACD, Bollinger Bands, EMA, dan banyak lagi. Kamu juga bisa switch sumber chart sesuai exchange yang aktif.',
+      'Bagian tengah menampilkan ringkasan koin: harga, grafik 24 jam, dan sinyal. Klik "Tampilkan Chart" kalau butuh chart TradingView lengkap dengan 100+ indikator.',
     target: '[data-tutorial="symbol-bar"]',
     position: 'bottom',
     icon: <BarChart2 className="h-5 w-5 text-blue-400" />,
@@ -73,39 +64,21 @@ const STEPS: Step[] = [
   },
   {
     id: 'signal',
-    title: 'Panel Analisa',
+    title: 'Menu Analisa',
     description:
-      'Sinyal algoritmik berbasis multi-indikator teknikal. Mode Spot: sinyal entry/exit berdasarkan RSI, MACD, EMA. Mode Futures: deteksi peluang Long/Short dengan scoring otomatis.',
+      'Scanner mencari kandidat Long/Short di pasar Futures lengkap dengan kesimpulan (beli sekarang atau tunggu) dan kalkulator ukuran posisi. Funding Squeeze berisi sinyal F3 yang sedang diuji. Hasil Backtest merangkum strategi mana yang sudah dan belum terbukti.',
     target: '[data-tutorial="right-tabs"]',
     position: 'left',
     icon: <BarChart2 className="h-5 w-5 text-primary" />,
   },
   {
     id: 'scanner',
-    title: 'Bullish Scanner',
+    title: 'Bot Auto-Trade',
     description:
-      'Scanner otomatis yang men-scan seluruh pasar dan mendeteksi setup bullish secara real-time. Hemat waktu — tidak perlu analisa coin satu per satu.',
+      'Menu Bot menampilkan status bot, saldo, posisi terbuka, dan log aktivitas. Bot berjalan dalam mode PAPER (simulasi) — tombol merah besar menutup semua posisi dalam keadaan darurat.',
     target: '[data-tutorial="right-tabs"]',
     position: 'left',
     icon: <Scan className="h-5 w-5 text-orange-400" />,
-  },
-  {
-    id: 'chart-mode',
-    title: 'Grid Mode',
-    description:
-      'Monitor beberapa aset sekaligus dalam satu tampilan grid. Tambahkan koin ke grid via tombol "+ Grid" di symbol bar, dan pantau gerakannya secara bersamaan.',
-    target: '[data-tutorial="chart-mode"]',
-    position: 'bottom',
-    icon: <LayoutGrid className="h-5 w-5 text-yellow-400" />,
-  },
-  {
-    id: 'profile',
-    title: 'Profil',
-    description:
-      'Klik avatar untuk mengelola akun: ubah username, email, dan password.',
-    target: '[data-tutorial="user-profile"]',
-    position: 'bottom-left',
-    icon: <User className="h-5 w-5 text-violet-400" />,
   },
 ]
 
@@ -287,20 +260,20 @@ export function TutorialStepper({ isActive, currentStep, onNext, onPrev, onSkip 
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-white/25 tabular-nums">
+                  <span className="text-xs text-white/70 tabular-nums">
                     {currentStep + 1}/{total}
                   </span>
                   <button
                     onClick={onSkip}
-                    className="p-1 rounded-lg text-white/25 hover:text-white/60 hover:bg-white/6 transition-colors"
+                    className="p-1 rounded-lg text-white/70 hover:text-white/60 hover:bg-white/6 transition-colors"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
               </div>
 
-              <h3 className="font-bold text-white text-[15px] leading-snug mb-2">{step.title}</h3>
-              <p className="text-[13px] text-white/55 leading-relaxed">{step.description}</p>
+              <h3 className="font-bold text-white text-base leading-snug mb-2">{step.title}</h3>
+              <p className="text-sm text-white/70 leading-relaxed">{step.description}</p>
             </div>
 
             {/* Footer */}
@@ -327,26 +300,26 @@ export function TutorialStepper({ isActive, currentStep, onNext, onPrev, onSkip 
                 {!isFirst && (
                   <button
                     onClick={onPrev}
-                    className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold text-white/40 hover:text-white/70 hover:bg-white/6 rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white/70 hover:text-white/70 hover:bg-white/6 rounded-lg transition-colors"
                   >
-                    <ChevronLeft className="h-3.5 w-3.5" />
+                    <ChevronLeft className="h-5 w-5" />
                     Kembali
                   </button>
                 )}
                 {isFirst && (
                   <button
                     onClick={onSkip}
-                    className="px-3 py-1.5 text-[11px] font-semibold text-white/30 hover:text-white/55 hover:bg-white/6 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-xs font-semibold text-white/70 hover:text-white/70 hover:bg-white/6 rounded-lg transition-colors"
                   >
                     Skip Tour
                   </button>
                 )}
                 <button
                   onClick={() => onNext()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold bg-white text-black rounded-lg hover:bg-white/90 active:scale-[0.97] transition-all"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold bg-white text-black rounded-lg hover:bg-white/90 active:scale-[0.97] transition-all"
                 >
                   {isLast ? 'Mulai Trading!' : 'Lanjut'}
-                  {!isLast && <ChevronRight className="h-3.5 w-3.5" />}
+                  {!isLast && <ChevronRight className="h-5 w-5" />}
                 </button>
               </div>
             </div>

@@ -5,6 +5,11 @@ import type { PriceAlert, AlertDirection } from '@/hooks/usePriceAlerts'
 import type { TechnicalAlert, TechIndicator, TechCondition } from '@/hooks/useTechnicalAlerts'
 import { SIGNAL_TIMEFRAMES, type SignalTimeframe } from '@/hooks/useSignalData'
 import { cn } from '@/lib/utils'
+import { CoinIcon } from '@/components/CoinIcon'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { Pill, PillTabs } from '@/components/ui/PillTabs'
+import { Badge } from '@/components/ui/Badge'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface Props {
   ticker: Ticker | null
@@ -27,54 +32,23 @@ type SubTab = 'price' | 'technical'
 const notifSupported = 'Notification' in window
 const notifGranted = () => notifSupported && Notification.permission === 'granted'
 
-function PriceAlertRow({ alert, onRemove }: { alert: PriceAlert; onRemove: (id: string) => void }) {
-  return (
-    <div className={cn('flex items-center gap-2 px-3 py-2 border-b border-border/50', alert.triggered && 'opacity-50')}>
-      <div className={cn('w-1.5 h-1.5 rounded-full shrink-0',
-        alert.triggered ? 'bg-muted-foreground' : alert.direction === 'above' ? 'bg-green-400' : 'bg-red-400'
-      )} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-foreground">{alert.baseAsset}</span>
-          <span className={cn('text-[9px] px-1 py-0.5 rounded font-semibold',
-            alert.direction === 'above' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
-          )}>
-            {alert.direction === 'above' ? '↑ Di atas' : '↓ Di bawah'}
-          </span>
-          {alert.triggered && <span className="text-[9px] bg-muted px-1 py-0.5 rounded text-muted-foreground">Terpicu</span>}
-        </div>
-        <span className="text-[9px] font-mono text-muted-foreground">
-          Target: {alert.targetPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}
-        </span>
-      </div>
-      <button onClick={() => onRemove(alert.id)} className="text-muted-foreground hover:text-red-400 transition-colors shrink-0">
-        <Trash2 className="h-3 w-3" />
-      </button>
-    </div>
-  )
-}
+const INPUT_CLASS = 'flex-1 min-w-0 min-h-9 bg-muted/50 border border-border rounded-lg px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50'
+const ADD_BUTTON_CLASS = 'flex items-center gap-1 min-h-9 px-3 rounded-lg border border-primary/40 bg-primary/10 text-sm font-semibold text-primary hover:bg-primary/20 transition-colors disabled:opacity-40 shrink-0'
 
-function TechAlertRow({ alert, onRemove }: { alert: TechnicalAlert; onRemove: (id: string) => void }) {
-  const label = alert.indicator === 'RSI'
-    ? `RSI ${alert.condition === 'above' ? '>' : '<'} ${alert.value} @${alert.timeframe}`
-    : `Harga ${alert.condition === 'above' ? 'di atas' : 'di bawah'} EMA${alert.value} @${alert.timeframe}`
+function AlertRow({ baseAsset, triggered, badges, detail, onRemove }: { baseAsset: string; triggered: boolean; badges: React.ReactNode; detail: React.ReactNode; onRemove: () => void }) {
   return (
-    <div className={cn('flex items-center gap-2 px-3 py-2 border-b border-border/50', alert.triggered && 'opacity-50')}>
-      <div className={cn('w-1.5 h-1.5 rounded-full shrink-0',
-        alert.triggered ? 'bg-muted-foreground' : 'bg-purple-400'
-      )} />
+    <div className={cn('flex items-center gap-2.5 px-3 py-2 border-b border-border/50', triggered && 'opacity-50')}>
+      <CoinIcon asset={baseAsset} size={22} />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-foreground">{alert.baseAsset}</span>
-          <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-purple-500/15 text-purple-400">
-            {alert.indicator}
-          </span>
-          {alert.triggered && <span className="text-[9px] bg-muted px-1 py-0.5 rounded text-muted-foreground">Terpicu</span>}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-sm font-bold text-foreground">{baseAsset}</span>
+          {badges}
+          {triggered && <Badge>Terpicu</Badge>}
         </div>
-        <span className="text-[9px] text-muted-foreground">{label}</span>
+        <div className="text-xs text-muted-foreground">{detail}</div>
       </div>
-      <button onClick={() => onRemove(alert.id)} className="text-muted-foreground hover:text-red-400 transition-colors shrink-0">
-        <Trash2 className="h-3 w-3" />
+      <button onClick={onRemove} title="Hapus alert" className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0">
+        <Trash2 className="h-4 w-4" />
       </button>
     </div>
   )
@@ -98,6 +72,7 @@ export function PriceAlertPanel({
   const activeTechAlerts = technicalAlerts.filter((a) => a.symbol === ticker?.symbol)
   const triggeredTechCount = activeTechAlerts.filter((a) => a.triggered).length
   const totalCount = activeAlerts.length + activeTechAlerts.length
+  const canClear = subTab === 'price' ? triggeredCount > 0 : triggeredTechCount > 0
 
   const handleAddPrice = () => {
     if (!ticker) return
@@ -117,187 +92,147 @@ export function PriceAlertPanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-2">
-          <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[10px] font-semibold text-foreground">Alert</span>
-          {totalCount > 0 && (
-            <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">{totalCount}</span>
-          )}
-        </div>
-        {subTab === 'price' && triggeredCount > 0 && (
-          <button onClick={onClearTriggered} className="text-[9px] text-muted-foreground hover:text-foreground transition-colors">
-            Hapus terpicu
-          </button>
+      <PanelHeader
+        icon={Bell}
+        title={ticker ? `Alert · ${ticker.baseAsset}` : 'Alert'}
+        right={
+          <>
+            {totalCount > 0 && <Badge tone="primary">{totalCount} aktif</Badge>}
+            {canClear && (
+              <button onClick={subTab === 'price' ? onClearTriggered : onClearTriggeredTechnical} className="hover:text-foreground">
+                Hapus terpicu
+              </button>
+            )}
+          </>
+        }
+        subtitle="Notifikasi browser berbunyi saat harga atau indikator menyentuh target (selama aplikasi terbuka)."
+      >
+        <PillTabs
+          value={subTab}
+          onChange={setSubTab}
+          options={[{ id: 'price', label: 'Harga' }, { id: 'technical', label: 'Teknikal' }]}
+        />
+        {notifSupported && !notifGranted() && (
+          <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-2.5 py-1.5">
+            <BellOff className="h-4 w-4 text-yellow-400 shrink-0" />
+            <p className="text-xs text-yellow-300 flex-1">Izinkan notifikasi agar alert berbunyi.</p>
+            <button onClick={onRequestPermission} className="text-xs text-yellow-400 hover:text-yellow-200 font-semibold shrink-0">Izinkan</button>
+          </div>
         )}
-        {subTab === 'technical' && triggeredTechCount > 0 && (
-          <button onClick={onClearTriggeredTechnical} className="text-[9px] text-muted-foreground hover:text-foreground transition-colors">
-            Hapus terpicu
-          </button>
-        )}
-      </div>
+      </PanelHeader>
 
-      {/* Sub-tabs */}
-      <div className="flex border-b border-border shrink-0">
-        <button
-          onClick={() => setSubTab('price')}
-          className={cn('flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-semibold transition-colors',
-            subTab === 'price' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <Bell className="h-3 w-3" /> Harga
-        </button>
-        <button
-          onClick={() => setSubTab('technical')}
-          className={cn('flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-semibold transition-colors',
-            subTab === 'technical' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <Activity className="h-3 w-3" /> Teknikal
-        </button>
-      </div>
-
-      {/* Notification permission */}
-      {notifSupported && !notifGranted() && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-yellow-950/40 border-b border-yellow-800/30 shrink-0">
-          <BellOff className="h-3 w-3 text-yellow-400 shrink-0" />
-          <p className="text-[9px] text-yellow-300 flex-1">Izinkan notifikasi agar alert berbunyi.</p>
-          <button onClick={onRequestPermission} className="text-[9px] text-yellow-400 hover:text-yellow-200 font-semibold shrink-0">Izinkan</button>
-        </div>
-      )}
-
-      {subTab === 'price' ? (
+      {!ticker ? (
+        <EmptyState icon={Bell} title="Pilih koin terlebih dahulu" description="Alert dibuat untuk koin yang sedang dipilih." />
+      ) : subTab === 'price' ? (
         <>
-          {/* Price alert form */}
-          {ticker ? (
-            <div className="px-3 py-2.5 border-b border-border shrink-0">
-              <p className="text-[9px] text-muted-foreground mb-2">
-                Alert harga untuk <span className="text-foreground font-semibold">{ticker.baseAsset}</span>
-                {currentPrice > 0 && <span className="ml-1 font-mono">(live: {currentPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })})</span>}
-              </p>
-              <div className="flex gap-1 mb-2">
-                {(['above', 'below'] as AlertDirection[]).map((d) => (
-                  <button key={d} onClick={() => setDirection(d)}
-                    className={cn('flex-1 py-1 text-[9px] font-semibold rounded transition-colors',
-                      direction === d
-                        ? d === 'above' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                    )}>
-                    {d === 'above' ? '↑ Di atas' : '↓ Di bawah'}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-1">
-                <input type="number" value={targetInput} onChange={(e) => setTargetInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddPrice()}
-                  placeholder="Target harga..."
-                  className="flex-1 bg-muted/50 border border-border rounded px-2 py-1 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-                />
-                <button onClick={handleAddPrice} disabled={!targetInput}
-                  className="px-2 py-1 bg-primary/20 text-primary rounded text-[9px] font-semibold hover:bg-primary/30 transition-colors disabled:opacity-40 shrink-0">
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
+          <div className="px-3 py-2.5 border-b border-border shrink-0 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Harga sekarang: <span className="font-mono text-foreground">{currentPrice > 0 ? currentPrice.toLocaleString('en-US', { maximumFractionDigits: 8 }) : '—'}</span>
+            </p>
+            <div className="flex gap-1.5">
+              {(['above', 'below'] as AlertDirection[]).map((d) => (
+                <Pill key={d} active={direction === d} onClick={() => setDirection(d)} className="flex-1">
+                  {d === 'above' ? '↑ Naik ke atas' : '↓ Turun ke bawah'}
+                </Pill>
+              ))}
             </div>
-          ) : (
-            <div className="px-3 py-2.5 border-b border-border shrink-0">
-              <p className="text-[9px] text-muted-foreground">Pilih koin terlebih dahulu.</p>
+            <div className="flex gap-1.5">
+              <input
+                type="number"
+                value={targetInput}
+                onChange={(e) => setTargetInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddPrice()}
+                placeholder="Target harga…"
+                className={INPUT_CLASS}
+              />
+              <button onClick={handleAddPrice} disabled={!targetInput} className={ADD_BUTTON_CLASS}>
+                <Plus className="h-4 w-4" /> Tambah
+              </button>
             </div>
-          )}
+          </div>
           <div className="flex-1 overflow-y-auto">
             {activeAlerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8">
-                <BellRing className="h-6 w-6 text-muted-foreground/40" />
-                <p className="text-[10px] text-muted-foreground">Belum ada price alert</p>
-              </div>
-            ) : activeAlerts.map((a) => <PriceAlertRow key={a.id} alert={a} onRemove={onRemove} />)}
+              <EmptyState icon={BellRing} title="Belum ada alert harga" />
+            ) : activeAlerts.map((a) => (
+              <AlertRow
+                key={a.id}
+                baseAsset={a.baseAsset}
+                triggered={a.triggered}
+                badges={<Badge tone={a.direction === 'above' ? 'green' : 'red'}>{a.direction === 'above' ? '↑ Di atas' : '↓ Di bawah'}</Badge>}
+                detail={<span className="font-mono">Target: {a.targetPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>}
+                onRemove={() => onRemove(a.id)}
+              />
+            ))}
           </div>
           {alerts.length > activeAlerts.length && (
-            <div className="px-3 py-1.5 border-t border-border shrink-0">
-              <p className="text-[9px] text-muted-foreground">Total tersimpan: {alerts.length} koin</p>
-            </div>
+            <div className="px-3 py-1.5 border-t border-border shrink-0 text-xs text-muted-foreground">Total tersimpan: {alerts.length} alert</div>
           )}
         </>
       ) : (
         <>
-          {/* Technical alert form */}
-          {ticker ? (
-            <div className="px-3 py-2.5 border-b border-border shrink-0 flex flex-col gap-2">
-              <p className="text-[9px] text-muted-foreground">
-                Alert teknikal untuk <span className="text-foreground font-semibold">{ticker.baseAsset}</span>
-              </p>
-              <div className="flex gap-1">
-                {(['RSI', 'EMA'] as TechIndicator[]).map((ind) => (
-                  <button key={ind} onClick={() => setTechIndicator(ind)}
-                    className={cn('flex-1 py-1 text-[9px] font-semibold rounded transition-colors',
-                      techIndicator === ind ? 'bg-purple-500/20 text-purple-400' : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                    )}>
-                    {ind}
-                  </button>
-                ))}
-                {(['above', 'below'] as TechCondition[]).map((c) => (
-                  <button key={c} onClick={() => setTechCondition(c)}
-                    className={cn('flex-1 py-1 text-[9px] font-semibold rounded transition-colors',
-                      techCondition === c
-                        ? c === 'above' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                    )}>
-                    {c === 'above' ? '↑' : '↓'}
-                  </button>
+          <div className="px-3 py-2.5 border-b border-border shrink-0 space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              {(['RSI', 'EMA'] as TechIndicator[]).map((ind) => (
+                <Pill key={ind} active={techIndicator === ind} onClick={() => setTechIndicator(ind)}>{ind}</Pill>
+              ))}
+              <span className="w-px h-5 bg-border self-center mx-0.5" />
+              {(['above', 'below'] as TechCondition[]).map((c) => (
+                <Pill key={c} active={techCondition === c} onClick={() => setTechCondition(c)}>{c === 'above' ? '↑ Di atas' : '↓ Di bawah'}</Pill>
+              ))}
+            </div>
+            {techIndicator === 'EMA' && (
+              <div className="flex gap-1.5">
+                {[20, 50, 200].map((p) => (
+                  <Pill key={p} active={techValue === String(p)} onClick={() => setTechValue(String(p))}>EMA{p}</Pill>
                 ))}
               </div>
-              {techIndicator === 'EMA' && (
-                <div className="flex gap-1">
-                  {[20, 50, 200].map((p) => (
-                    <button key={p} onClick={() => setTechValue(String(p))}
-                      className={cn('flex-1 py-1 text-[9px] font-semibold rounded transition-colors',
-                        techValue === String(p) ? 'bg-purple-500/20 text-purple-400' : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                      )}>
-                      EMA{p}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-1">
-                <input type="number" value={techValue} onChange={(e) => setTechValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddTech()}
-                  placeholder={techIndicator === 'RSI' ? 'Nilai RSI (0-100)' : 'Period EMA'}
-                  className="flex-1 bg-muted/50 border border-border rounded px-2 py-1 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-                />
-                <select value={techTf} onChange={(e) => setTechTf(e.target.value as SignalTimeframe)}
-                  className="bg-muted/50 border border-border rounded px-1 py-1 text-[10px] text-foreground focus:outline-none">
-                  {SIGNAL_TIMEFRAMES.filter((tf) => tf !== '5m').map((tf) => (
-                    <option key={tf} value={tf}>{tf}</option>
-                  ))}
-                </select>
-                <button onClick={handleAddTech} disabled={!techValue}
-                  className="px-2 py-1 bg-primary/20 text-primary rounded text-[9px] font-semibold hover:bg-primary/30 transition-colors disabled:opacity-40 shrink-0">
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
-              <p className="text-[8px] text-muted-foreground">
-                {techIndicator === 'RSI' ? `Alert saat RSI ${techCondition === 'above' ? '>' : '<'} ${techValue || '?'}` : `Alert saat harga ${techCondition === 'above' ? 'di atas' : 'di bawah'} EMA${techValue || '?'}`}
-              </p>
+            )}
+            <div className="flex gap-1.5">
+              <input
+                type="number"
+                value={techValue}
+                onChange={(e) => setTechValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddTech()}
+                placeholder={techIndicator === 'RSI' ? 'Nilai RSI (0-100)' : 'Periode EMA'}
+                className={INPUT_CLASS}
+              />
+              <select
+                value={techTf}
+                onChange={(e) => setTechTf(e.target.value as SignalTimeframe)}
+                className="min-h-9 bg-muted/50 border border-border rounded-lg px-2 text-sm text-foreground focus:outline-none"
+              >
+                {SIGNAL_TIMEFRAMES.filter((tf) => tf !== '5m').map((tf) => (
+                  <option key={tf} value={tf}>{tf}</option>
+                ))}
+              </select>
+              <button onClick={handleAddTech} disabled={!techValue} className={ADD_BUTTON_CLASS}>
+                <Plus className="h-4 w-4" /> Tambah
+              </button>
             </div>
-          ) : (
-            <div className="px-3 py-2.5 border-b border-border shrink-0">
-              <p className="text-[9px] text-muted-foreground">Pilih koin terlebih dahulu.</p>
-            </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              {techIndicator === 'RSI'
+                ? `Berbunyi saat RSI ${techCondition === 'above' ? '>' : '<'} ${techValue || '?'} di grafik ${techTf}`
+                : `Berbunyi saat harga ${techCondition === 'above' ? 'di atas' : 'di bawah'} EMA${techValue || '?'} di grafik ${techTf}`}
+            </p>
+          </div>
           <div className="flex-1 overflow-y-auto">
             {activeTechAlerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8">
-                <Activity className="h-6 w-6 text-muted-foreground/40" />
-                <p className="text-[10px] text-muted-foreground">Belum ada technical alert</p>
-                <p className="text-[9px] text-muted-foreground/60">Dicek setiap 2 menit</p>
-              </div>
-            ) : activeTechAlerts.map((a) => <TechAlertRow key={a.id} alert={a} onRemove={onRemoveTechnical} />)}
+              <EmptyState icon={Activity} title="Belum ada alert teknikal" description="Dicek setiap 2 menit." />
+            ) : activeTechAlerts.map((a) => (
+              <AlertRow
+                key={a.id}
+                baseAsset={a.baseAsset}
+                triggered={a.triggered}
+                badges={<Badge tone="blue">{a.indicator}</Badge>}
+                detail={a.indicator === 'RSI'
+                  ? `RSI ${a.condition === 'above' ? '>' : '<'} ${a.value} · grafik ${a.timeframe}`
+                  : `Harga ${a.condition === 'above' ? 'di atas' : 'di bawah'} EMA${a.value} · grafik ${a.timeframe}`}
+                onRemove={() => onRemoveTechnical(a.id)}
+              />
+            ))}
           </div>
           {technicalAlerts.length > activeTechAlerts.length && (
-            <div className="px-3 py-1.5 border-t border-border shrink-0">
-              <p className="text-[9px] text-muted-foreground">Total tech alerts: {technicalAlerts.length}</p>
-            </div>
+            <div className="px-3 py-1.5 border-t border-border shrink-0 text-xs text-muted-foreground">Total tersimpan: {technicalAlerts.length} alert teknikal</div>
           )}
         </>
       )}

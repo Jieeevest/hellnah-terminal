@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react'
-import { RefreshCw, ExternalLink, Newspaper, TrendingUp, Filter } from 'lucide-react'
+import { AlertTriangle, RefreshCw, ExternalLink, Newspaper } from 'lucide-react'
 import { useCryptoNews, type NewsSentiment, type NewsArticle } from '@/hooks/useCryptoNews'
 import { cn } from '@/lib/utils'
+import { CoinIcon } from '@/components/CoinIcon'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { PillTabs } from '@/components/ui/PillTabs'
+import { Badge, type BadgeTone } from '@/components/ui/Badge'
+import { EmptyState } from '@/components/ui/EmptyState'
+
+const SENTIMENT_TONE: Record<NewsSentiment, BadgeTone> = { Positif: 'green', Negatif: 'red', Netral: 'yellow' }
 
 const SENTIMENT_CFG: Record<NewsSentiment, { color: string; bg: string; dot: string }> = {
   Positif: { color: 'text-green-400',  bg: 'bg-green-500/15',  dot: 'bg-green-400' },
@@ -79,17 +86,15 @@ function ArticleRow({ article }: { article: NewsArticle }) {
       <span className={cn('mt-1.5 w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-[10px] text-foreground leading-tight group-hover:text-primary transition-colors line-clamp-2">
+          <p className="text-sm text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-2">
             {article.title}
           </p>
-          <ExternalLink className="h-2.5 w-2.5 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
         <div className="flex items-center gap-2 mt-1">
-          <span className={cn('text-[9px] font-semibold px-1 py-0.5 rounded', cfg.color, cfg.bg)}>
-            {article.sentiment}
-          </span>
-          <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">{article.source}</span>
-          <span className="text-[9px] text-muted-foreground ml-auto shrink-0">{timeAgo(article.publishedAt)}</span>
+          <Badge tone={SENTIMENT_TONE[article.sentiment]}>{article.sentiment}</Badge>
+          <span className="text-xs text-muted-foreground truncate max-w-[80px]">{article.source}</span>
+          <span className="text-xs text-muted-foreground ml-auto shrink-0">{timeAgo(article.publishedAt)}</span>
         </div>
       </div>
     </a>
@@ -116,135 +121,85 @@ export function CryptoNewsPanel({ selectedCoin }: Props) {
     return { positif: p, negatif: n, netral: nt, overallSentiment: overall }
   }, [articles])
 
+  // activeCategory sudah null untuk tab 'all' maupun 'trending', jadi `articles`
+  // di sini sekaligus berfungsi sebagai daftar "semua berita" untuk trending.
   const trendingCoins = useMemo(
     () => (activeTab === 'trending' ? getTrendingCoins(articles) : []),
     [articles, activeTab],
   )
 
-  // Use "all" articles for trending tab (always fetch all)
-  const { articles: allArticles } = useCryptoNews(null)
-  const trendingFromAll = useMemo(
-    () => (activeTab === 'trending' ? getTrendingCoins(allArticles) : []),
-    [allArticles, activeTab],
-  )
-
-  const tabs: { id: NewsTab; label: string; icon: React.ReactNode; disabled?: boolean }[] = [
-    { id: 'all',      label: 'Semua',    icon: <Newspaper className="h-3 w-3" /> },
-    { id: 'coin',     label: selectedCoin ?? 'Koin',  icon: <Filter className="h-3 w-3" />, disabled: !selectedCoin },
-    { id: 'trending', label: 'Trending', icon: <TrendingUp className="h-3 w-3" /> },
+  const tabs: { id: NewsTab; label: string }[] = [
+    { id: 'all', label: 'Semua' },
+    ...(selectedCoin ? [{ id: 'coin' as NewsTab, label: selectedCoin }] : []),
+    { id: 'trending', label: 'Trending' },
   ]
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Sub-tabs */}
-      <div className="flex border-b border-border shrink-0">
-        {tabs.map((t) => (
+      <PanelHeader
+        icon={Newspaper}
+        title="Berita Kripto"
+        right={
           <button
-            key={t.id}
-            onClick={() => !t.disabled && setActiveTab(t.id)}
-            disabled={t.disabled}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium transition-colors',
-              activeTab === t.id
-                ? 'text-primary border-b-2 border-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground',
-              t.disabled && 'opacity-30 cursor-not-allowed'
-            )}
+            onClick={refresh}
+            disabled={loading}
+            className="flex items-center gap-1 min-h-7 px-2.5 rounded-full border border-border text-xs hover:text-foreground hover:bg-muted disabled:opacity-40"
           >
-            {t.icon}
-            {t.label}
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> Refresh
           </button>
-        ))}
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border shrink-0">
-        <div className="flex items-center gap-2">
+        }
+        subtitle={
+          activeTab === 'trending'
+            ? 'Koin yang paling banyak disebut di berita terbaru'
+            : lastFetch > 0 ? `Diperbarui ${timeAgo(lastFetch)} · sumber CryptoCompare` : 'Berita terbaru dari CryptoCompare'
+        }
+      >
+        <div className="flex flex-wrap items-center gap-1.5">
+          <PillTabs value={activeTab} onChange={setActiveTab} options={tabs} />
           {articles.length > 0 && activeTab !== 'trending' && (
-            <>
-              <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded', SENTIMENT_CFG[overallSentiment].color, SENTIMENT_CFG[overallSentiment].bg)}>
-                {overallSentiment}
-              </span>
-              <div className="flex items-center gap-1.5 text-[9px]">
-                <span className="text-green-400">{positif}↑</span>
-                <span className="text-yellow-400">{netral}→</span>
-                <span className="text-red-400">{negatif}↓</span>
-              </div>
-            </>
-          )}
-          {activeTab === 'trending' && (
-            <span className="text-[9px] text-muted-foreground">Koin paling banyak disebut</span>
+            <span className="ml-auto flex items-center gap-1.5 text-xs">
+              <Badge tone={SENTIMENT_TONE[overallSentiment]}>{overallSentiment}</Badge>
+              <span className="text-green-400">{positif}↑</span>
+              <span className="text-yellow-400">{netral}→</span>
+              <span className="text-red-400">{negatif}↓</span>
+            </span>
           )}
         </div>
-        <button
-          onClick={refresh}
-          disabled={loading}
-          className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-        >
-          <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
-          Refresh
-        </button>
-      </div>
+      </PanelHeader>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'trending' ? (
-          /* Trending coins */
-          trendingFromAll.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-8">
-              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">Menganalisis berita...</span>
-            </div>
+          trendingCoins.length === 0 ? (
+            <EmptyState loading title="Menganalisis berita…" />
           ) : (
-            <div className="flex flex-col gap-0">
-              {trendingFromAll.map((coin, i) => {
-                const cfg = SENTIMENT_CFG[coin.sentiment]
-                return (
-                  <div
-                    key={coin.symbol}
-                    className="flex items-center gap-3 px-3 py-2 border-b border-border/50"
-                  >
-                    <span className="text-[9px] text-muted-foreground w-4 shrink-0">#{i + 1}</span>
-                    <span className="text-[10px] font-bold text-foreground flex-1">{coin.symbol}</span>
-                    <span className={cn('text-[9px] font-semibold px-1.5 py-0.5 rounded', cfg.color, cfg.bg)}>
-                      {coin.sentiment}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground shrink-0">{coin.count} berita</span>
-                  </div>
-                )
-              })}
-              <p className="text-[9px] text-muted-foreground text-center py-3 px-3">
-                Berdasarkan {allArticles.length} berita terbaru
-              </p>
-            </div>
+            <>
+              {trendingCoins.map((coin, i) => (
+                <div key={coin.symbol} className="flex items-center gap-2.5 px-3 py-2 border-b border-border/50">
+                  <span className="text-xs text-muted-foreground w-5 shrink-0">#{i + 1}</span>
+                  <CoinIcon asset={coin.symbol} size={22} />
+                  <span className="text-sm font-bold text-foreground flex-1">{coin.symbol}</span>
+                  <Badge tone={SENTIMENT_TONE[coin.sentiment]}>{coin.sentiment}</Badge>
+                  <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">{coin.count} berita</span>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground text-center py-3 px-3">Berdasarkan {articles.length} berita terbaru</p>
+            </>
           )
         ) : loading && articles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-8">
-            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-            <span className="text-[10px] text-muted-foreground">Memuat berita...</span>
-          </div>
+          <EmptyState loading title="Memuat berita…" />
         ) : error ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
-            <span className="text-[10px] text-red-400">Gagal memuat: {error}</span>
-            <button onClick={refresh} className="text-[10px] text-primary hover:underline">Coba lagi</button>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title="Gagal memuat berita"
+            description={error}
+            action={<button onClick={refresh} className="text-xs text-primary hover:underline">Coba lagi</button>}
+          />
         ) : articles.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-[10px] text-muted-foreground">
-            {activeTab === 'coin' ? `Tidak ada berita untuk ${selectedCoin}` : 'Belum ada berita'}
-          </div>
+          <EmptyState icon={Newspaper} title={activeTab === 'coin' ? `Tidak ada berita untuk ${selectedCoin}` : 'Belum ada berita'} />
         ) : (
           articles.map((a) => <ArticleRow key={a.id} article={a} />)
         )}
       </div>
-
-      {/* Footer */}
-      {lastFetch > 0 && !loading && activeTab !== 'trending' && (
-        <div className="px-3 py-1.5 border-t border-border shrink-0">
-          <span className="text-[9px] text-muted-foreground">
-            Diperbarui {timeAgo(lastFetch)} · CryptoCompare · Cache 30m
-          </span>
-        </div>
-      )}
     </div>
   )
 }

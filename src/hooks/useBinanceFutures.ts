@@ -5,6 +5,7 @@ import { API_URLS } from '@/constants/apiUrls'
 
 const BASE = API_URLS.binance.futures
 const WS_BASE = API_URLS.binance.wsFutures
+const UI_FLUSH_MS = 250
 
 export function useBinanceFutureTickers() {
   const [tickers, setTickers] = useState<Ticker[]>([])
@@ -67,14 +68,19 @@ export function useBinanceFutureOrderBook(symbol: string) {
     wsRef.current?.close()
     const ws = new WebSocket(`${WS_BASE}/${symbol.toLowerCase()}@depth20@100ms`)
     wsRef.current = ws
+    // depth@100ms = 10 pesan/detik; render tiap pesan bikin seluruh Dashboard ikut render ulang.
+    let latest: OrderBook | null = null
     ws.onmessage = (e) => {
       const d = JSON.parse(e.data)
-      setOrderBook({
-        bids: (d.b as string[][]).slice(0, 15).map(([p, q]) => [parseFloat(p), parseFloat(q)]),
-        asks: (d.a as string[][]).slice(0, 15).map(([p, q]) => [parseFloat(p), parseFloat(q)]),
-      })
+      latest = {
+        bids: (d.b as string[][]).slice(0, 20).map(([p, q]) => [parseFloat(p), parseFloat(q)]),
+        asks: (d.a as string[][]).slice(0, 20).map(([p, q]) => [parseFloat(p), parseFloat(q)]),
+      }
     }
-    return () => ws.close()
+    const flush = setInterval(() => {
+      if (latest) { setOrderBook(latest); latest = null }
+    }, UI_FLUSH_MS)
+    return () => { ws.close(); clearInterval(flush) }
   }, [symbol])
 
   return orderBook
@@ -87,28 +93,39 @@ export function useBinanceFutureTrades(symbol: string) {
   useEffect(() => {
     if (!symbol) return
     wsRef.current?.close()
-    axios.get(`${BASE}/trades`, { params: { symbol: symbol.toUpperCase(), limit: 30 } }).then(({ data }) => {
-      setTrades(
-        (data as any[]).reverse().map((t: any) => ({
-          id: t.id,
-          price: parseFloat(t.price),
-          qty: parseFloat(t.qty),
-          time: t.time,
-          isBuyerMaker: t.isBuyerMaker,
-        }))
-      )
+    setTrades([])
+    let cancelled = false
+    // aggTrades (bukan /trades) supaya ID-nya satu jenis dengan stream @aggTrade — kalau beda, key React bisa bentrok.
+    axios.get(`${BASE}/aggTrades`, { params: { symbol: symbol.toUpperCase(), limit: 30 } }).then(({ data }) => {
+      if (cancelled) return
+      const initial: Trade[] = (data as any[]).reverse().map((t: any) => ({
+        id: t.a,
+        price: parseFloat(t.p),
+        qty: parseFloat(t.q),
+        time: t.T,
+        isBuyerMaker: t.m,
+      }))
+      setTrades((prev) => {
+        const seen = new Set(prev.map((t) => t.id))
+        return [...prev, ...initial.filter((t) => !seen.has(t.id))].slice(0, 30)
+      })
     })
 
     const ws = new WebSocket(`${WS_BASE}/${symbol.toLowerCase()}@aggTrade`)
     wsRef.current = ws
+    // Koin ramai bisa puluhan transaksi/detik — dikumpulkan dulu, dirender maksimal 4x/detik.
+    let buffer: Trade[] = []
     ws.onmessage = (e) => {
       const t = JSON.parse(e.data)
-      setTrades((prev) => [
-        { id: t.a, price: parseFloat(t.p), qty: parseFloat(t.q), time: t.T, isBuyerMaker: t.m },
-        ...prev.slice(0, 29),
-      ])
+      buffer.unshift({ id: t.a, price: parseFloat(t.p), qty: parseFloat(t.q), time: t.T, isBuyerMaker: t.m })
     }
-    return () => ws.close()
+    const flush = setInterval(() => {
+      if (!buffer.length) return
+      const batch = buffer
+      buffer = []
+      setTrades((prev) => [...batch, ...prev].slice(0, 30))
+    }, UI_FLUSH_MS)
+    return () => { cancelled = true; ws.close(); clearInterval(flush) }
   }, [symbol])
 
   return trades

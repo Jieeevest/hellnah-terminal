@@ -6,6 +6,12 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // Sengaja lebih besar dari default Tailwind (xs 12px, sm 14px) — user butuh teks minimal 13px biar kebaca.
+      fontSize: {
+        xs: ['0.8125rem', '1.125rem'],
+        sm: ['0.9375rem', '1.375rem'],
+        base: ['1rem', '1.5rem'],
+      },
       fontFamily: {
         sans: ['Space Grotesk', ...defaultTheme.fontFamily.sans],
       },

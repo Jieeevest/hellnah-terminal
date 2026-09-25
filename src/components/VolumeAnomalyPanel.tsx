@@ -1,8 +1,11 @@
-import { useMemo } from 'react'
 import { TrendingUp, TrendingDown, Zap } from 'lucide-react'
 import type { Ticker, Exchange, MarketType } from '@/types'
-import { detectVolumeAnomalies } from '@/lib/volumeAnomaly'
+import { useVolumeSpikes } from '@/hooks/useVolumeSpikes'
 import { cn, formatNumber } from '@/lib/utils'
+import { CoinIcon } from '@/components/CoinIcon'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Badge, type BadgeTone } from '@/components/ui/Badge'
 
 interface Props {
   tickers: Ticker[]
@@ -11,81 +14,68 @@ interface Props {
   onSelectCoin: (ticker: Ticker) => void
 }
 
-export function VolumeAnomalyPanel({ tickers, onSelectCoin }: Props) {
-  const anomalies = useMemo(() => detectVolumeAnomalies(tickers), [tickers])
+function spikeLevel(ratio: number): { label: string; tone: BadgeTone; bar: string } {
+  if (ratio >= 5) return { label: 'Sangat ramai', tone: 'orange', bar: 'bg-orange-400' }
+  if (ratio >= 3) return { label: 'Ramai', tone: 'yellow', bar: 'bg-yellow-400' }
+  return { label: 'Naik', tone: 'blue', bar: 'bg-sky-400' }
+}
 
-  if (tickers.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-[10px] text-muted-foreground">
-        Menunggu data ticker...
-      </div>
-    )
-  }
+export function VolumeAnomalyPanel({ tickers, marketType, onSelectCoin }: Props) {
+  const { spikes, progress, scanning, lastRunAt } = useVolumeSpikes(tickers, marketType)
+  const maxRatio = Math.max(...spikes.map((s) => s.ratio), 1)
+  const minutesAgo = lastRunAt ? Math.floor((Date.now() - lastRunAt) / 60_000) : null
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header info */}
-      <div className="px-3 py-1.5 border-b border-border shrink-0 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
-          <Zap className="h-3 w-3 text-yellow-400" />
-          Volume spike vs rata-rata pasar · {tickers.length} koin dipantau
-        </div>
-        <span className="text-[9px] font-semibold text-yellow-400">{anomalies.length} anomali</span>
-      </div>
-
-      {/* Column headers */}
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-1 px-3 py-1 border-b border-border shrink-0 text-[9px] text-muted-foreground">
-        <span>Koin</span>
-        <span className="text-right">Volume 24h</span>
-        <span className="text-right">Rasio</span>
-        <span className="text-right">Z-Score</span>
-      </div>
-
-      {/* Rows */}
-      <div className="flex-1 overflow-y-auto">
-        {anomalies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-10">
-            <Zap className="h-6 w-6 text-muted-foreground/30" />
-            <p className="text-[10px] text-muted-foreground">Tidak ada volume anomali saat ini</p>
-            <p className="text-[9px] text-muted-foreground/60">Threshold: Z-Score ≥ 1.5</p>
+      <PanelHeader
+        icon={Zap}
+        iconClassName="text-yellow-400"
+        title="Lonjakan Volume"
+        right={scanning ? `Memindai ${progress}%` : minutesAgo != null ? `${spikes.length} koin · ${minutesAgo < 1 ? 'baru saja' : `${minutesAgo} mnt lalu`}` : null}
+        subtitle="Volume 24 jam dibanding rata-rata harian 7 hari koin itu sendiri · 100 koin teratas, tanpa stablecoin"
+      >
+        {scanning && (
+          <div className="h-1 rounded-full bg-muted overflow-hidden">
+            <div className="h-full bg-yellow-400 transition-[width] duration-300" style={{ width: `${progress}%` }} />
           </div>
+        )}
+      </PanelHeader>
+
+      <div className="flex-1 overflow-y-auto">
+        {!spikes.length ? (
+          scanning || !lastRunAt
+            ? <EmptyState loading title="Membandingkan volume dengan 7 hari terakhir…" />
+            : <EmptyState icon={Zap} title="Tidak ada lonjakan volume saat ini" description="Minimal 1,8× dari rata-rata hariannya" />
         ) : (
-          anomalies.map(({ ticker, zScore, volumeRatio }) => {
+          spikes.map(({ ticker, ratio, avgDailyVolume }) => {
             const isUp = ticker.priceChangePercent >= 0
+            const level = spikeLevel(ratio)
             return (
               <button
                 key={ticker.symbol}
                 onClick={() => onSelectCoin(ticker)}
-                className="w-full grid grid-cols-[1fr_auto_auto_auto] gap-1 items-center px-3 py-2 border-b border-border/40 hover:bg-muted/30 transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 border-b border-border/40 hover:bg-muted/30 transition-colors text-left"
               >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className={cn(
-                    'w-1.5 h-1.5 rounded-full shrink-0',
-                    zScore >= 3 ? 'bg-orange-400' : 'bg-yellow-400'
-                  )} />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-foreground truncate">{ticker.baseAsset}</p>
-                    <p className={cn('text-[9px] flex items-center gap-0.5', isUp ? 'text-green-400' : 'text-red-400')}>
-                      {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                <CoinIcon asset={ticker.baseAsset} size={24} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-sm font-bold text-foreground">{ticker.baseAsset}</span>
+                    <span className={cn('inline-flex items-center gap-0.5 text-xs font-mono', isUp ? 'text-green-400' : 'text-red-400')}>
+                      {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                       {isUp ? '+' : ''}{ticker.priceChangePercent.toFixed(2)}%
-                    </p>
+                    </span>
+                    <Badge tone={level.tone}>{level.label}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className={cn('h-full rounded-full', level.bar)} style={{ width: `${(ratio / maxRatio) * 100}%` }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      ${formatNumber(ticker.volume)} <span className="opacity-60">vs ${formatNumber(avgDailyVolume)}</span>
+                    </span>
                   </div>
                 </div>
-                <span className="text-[9px] font-mono text-muted-foreground text-right">
-                  {formatNumber(ticker.volume)}
-                </span>
-                <span className={cn(
-                  'text-[9px] font-mono font-semibold text-right',
-                  volumeRatio >= 5 ? 'text-orange-400' : volumeRatio >= 3 ? 'text-yellow-400' : 'text-foreground/70'
-                )}>
-                  {volumeRatio.toFixed(1)}×
-                </span>
-                <span className={cn(
-                  'text-[9px] font-mono font-bold text-right',
-                  zScore >= 3 ? 'text-orange-400' : 'text-yellow-400'
-                )}>
-                  {zScore.toFixed(1)}σ
-                </span>
+                <span className="text-lg font-bold font-mono text-foreground w-14 text-right">{ratio.toFixed(1)}×</span>
               </button>
             )
           })

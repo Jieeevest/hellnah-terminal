@@ -64,8 +64,8 @@ export function InfoTooltip({ title, description, children, className = 'inline-
             }}
             className="bg-[#111318] border border-white/12 rounded-xl shadow-[0_8px_32px_-4px_rgba(0,0,0,0.7)] px-3 py-2.5"
           >
-            <p className="text-[10px] font-bold text-white/90 mb-1 leading-tight">{title}</p>
-            <p className="text-[9.5px] text-white/50 leading-relaxed">{description}</p>
+            <p className="text-xs font-bold text-white/90 mb-1 leading-tight">{title}</p>
+            <p className="text-[9.5px] text-white/70 leading-relaxed">{description}</p>
             {/* Caret */}
             <span
               style={{

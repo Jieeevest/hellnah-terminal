@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 const STORAGE_KEY = 'hellnah-terminal-tutorial-seen'
 
 export function useTutorial() {
-  const [isActive, setIsActive] = useState(() => !localStorage.getItem(STORAGE_KEY))
+  const [isActive, setIsActive] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
 
   const nextStep = useCallback((total: number) => {
